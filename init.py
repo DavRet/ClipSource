@@ -19,7 +19,6 @@ clipboard = app.clipboard()
 
 clips = []
 
-list = QtGui.QListView()
 
 try:
     import tkinter as tk  # for python 3
@@ -45,11 +44,16 @@ class Application:
 
 
 
-class Window(QtGui.QListWidget):
+class Window(QtGui.QMainWindow):
     def __init__(self):
         super(Window, self).__init__()
         uic.loadUi('clipui.ui', self)
+
+
         self.show()
+
+    def test(self):
+        print "test"
         # def initUI(self):
     #     QtGui.QToolTip.setFont(QtGui.QFont('SansSerif', 10))
     #
@@ -73,6 +77,13 @@ class Window(QtGui.QListWidget):
     #         item = QtGui.QListWidgetItem(self)
     #         item.setText(clip)
 
+window = Window()
+
+content_list = window.content_list
+content_model = QtGui.QStandardItemModel(content_list)
+
+source_list = window.source_list
+source_model = QtGui.QStandardItemModel(source_list)
 
 
 def main():
@@ -81,8 +92,15 @@ def main():
 
     #window = Window()
 
-    form = Window()  # We set the form to be our ExampleApp (design)
-    form.show()
+
+    content_list.setModel(content_model)
+    source_list.setModel(source_model)
+
+
+    # We set the form to be our ExampleApp (design)
+
+    #form.content_list.setModel(model)
+    window.show()
 
     #list.setWindowTitle('ClipSource')
     #list.setMinimumSize(600, 400)
@@ -90,7 +108,7 @@ def main():
 
     #list.show()
 
-    #setModelForList()
+    setModelForList()
 
     #root = tk.Tk()
     #app = Application(root)
@@ -102,17 +120,14 @@ def main():
 
 
 def setModelForList():
-    model = QtGui.QStandardItemModel(list)
 
 
     for clip in clips:
         clipText = QtGui.QStandardItem(clip[0])
         source = QtGui.QStandardItem(clip[1])
 
-
-        clipText.setCheckable(True)
-        model.appendRow(clipText)
-        model.appendRow(source)
+        content_model.appendRow(clipText)
+        source_model.appendRow(source)
 
     def on_item_changed(item):
         if not item.checkState():
@@ -123,14 +138,15 @@ def setModelForList():
 
 
         i = 0
-        while model.item(i):
-            if not model.item(i).checkState():
+        while content_model.item(i):
+            if not content_model.item(i).checkState():
                 return
             i += 1
 
-    model.itemChanged.connect(on_item_changed)
+    content_model.itemChanged.connect(on_item_changed)
 
-    list.setModel(model)
+    content_list.setModel(content_model)
+    source_list.setModel(source_model)
 
 
 def buttonClick():
@@ -138,6 +154,7 @@ def buttonClick():
 
 
 def clipboardChanged():
+
     mimeData = clipboard.mimeData()
 
     image = clipboard.image()
@@ -168,7 +185,7 @@ def clipboardChanged():
 
         clips.append(tuple((originalText, source)))
 
-        #setModelForList()
+        setModelForList()
 
         #clipboard.setText(originalText + "\n" + "Copied from:\n"  + source)
 

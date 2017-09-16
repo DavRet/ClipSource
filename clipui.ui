@@ -11,9 +11,9 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Form</string>
+   <string>ClipCource</string>
   </property>
-  <widget class="QListWidget" name="listWidget">
+  <widget class="QListView" name="content_list">
    <property name="geometry">
     <rect>
      <x>10</x>
@@ -23,7 +23,7 @@
     </rect>
    </property>
   </widget>
-  <widget class="QListWidget" name="listWidget_2">
+  <widget class="QListView" name="source_list">
    <property name="geometry">
     <rect>
      <x>340</x>
@@ -59,7 +59,7 @@
     <string>Source</string>
    </property>
   </widget>
-  <widget class="QRadioButton" name="radioButton">
+  <widget class="QRadioButton" name="add_source_button">
    <property name="geometry">
     <rect>
      <x>10</x>
