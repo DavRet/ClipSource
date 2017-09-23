@@ -11,15 +11,15 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>ClipCource</string>
+   <string>ClipSource</string>
   </property>
   <widget class="QListView" name="content_list">
    <property name="geometry">
     <rect>
      <x>10</x>
      <y>130</y>
-     <width>256</width>
-     <height>192</height>
+     <width>331</width>
+     <height>371</height>
     </rect>
    </property>
   </widget>
@@ -28,8 +28,8 @@
     <rect>
      <x>340</x>
      <y>130</y>
-     <width>256</width>
-     <height>192</height>
+     <width>341</width>
+     <height>371</height>
     </rect>
    </property>
   </widget>
@@ -59,11 +59,11 @@
     <string>Source</string>
    </property>
   </widget>
-  <widget class="QRadioButton" name="add_source_button">
+  <widget class="QRadioButton" name="source_radio">
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>360</y>
+     <y>510</y>
      <width>511</width>
      <height>20</height>
     </rect>
