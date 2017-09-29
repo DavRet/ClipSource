@@ -2,6 +2,7 @@ import sys
 import urllib2
 
 import exifread
+import rdflib
 import win32con
 from bs4 import BeautifulSoup
 
@@ -9,6 +10,8 @@ import HTMLClipboard
 import os
 import os.path
 import sys
+
+from libcredit import Credit, HTMLCreditFormatter, TextCreditFormatter
 
 from PySide import QtGui, QtCore
 
@@ -21,6 +24,29 @@ import pygubu
 from PyQt4 import QtGui, uic
 
 import win32clipboard as clp, win32api
+
+# clp.OpenClipboard(0)
+# clp.EmptyClipboard()
+# clp.SetClipboardData(0, None)
+# clp.CloseClipboard()
+
+# clp.OpenClipboard(None)
+# rc = clp.EnumClipboardFormats(0)
+# while rc:
+#     try:
+#         format_name = clp.GetClipboardFormatName(rc)
+#     except win32api.error:
+#         format_name = "?"
+#
+#     print format_name
+#     try:
+#         format = clp.GetClipboardData(rc)
+#     except win32api.error:
+#         format = "?"
+#     print format
+#     rc = clp.EnumClipboardFormats(rc)
+#
+# clp.CloseClipboard()
 
 
 class Application:
@@ -130,8 +156,47 @@ def buttonClick():
 def clipboardChanged():
     mimeData = clipboard.mimeData()
 
+    print "copied"
 
+    print clipboard.text()
+
+    clp.OpenClipboard(None)
+
+    rdf = ''
+
+    rc = clp.EnumClipboardFormats(0)
+    while rc:
+        try:
+            format_name = clp.GetClipboardFormatName(rc)
+        except win32api.error:
+            format_name = "?"
+        # print "format", rc, format_name
+        try:
+            format = clp.GetClipboardData(rc)
+        except win32api.error:
+            format = "?"
+
+        if (format_name == 'application/rdf+xml'):
+            rdf = format
+        print format_name
+        print format
+
+        rc = clp.EnumClipboardFormats(rc)
+
+    clp.CloseClipboard()
+
+    print rdf
+
+
+    #credit = Credit(rdf, "https://labs.creativecommons.org/2011/ccrel-guide/examples/image.html")
+    # #
+    # print str(credit)
+    # formattter = TextCreditFormatter()
+    # credit.format(formattter)
+    # #
+    # print formattter.get_text()
     if HTMLClipboard.HasHtml():
+        print "HAS HTML"
         source = HTMLClipboard.GetSource()
         print(source)
 
@@ -155,7 +220,7 @@ def clipboardChanged():
             clp.CloseClipboard()
             soup = BeautifulSoup(html, "html.parser")
 
-            link =  soup.find('img')['src']
+            link = soup.find('img')['src']
             print link
             source = link
 
