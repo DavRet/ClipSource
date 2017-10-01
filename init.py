@@ -20,6 +20,9 @@ clipboard = app.clipboard()
 
 clips = []
 
+currentIndex = []
+
+
 import pygubu
 from PyQt4 import QtGui, uic
 
@@ -78,6 +81,8 @@ source_model = QtGui.QStandardItemModel(source_list)
 
 source_radio = window.source_radio
 
+clip_edit = window.clip_edit
+
 auto_source_enabled = False
 
 
@@ -96,6 +101,15 @@ def main():
     content_list.clicked.connect(contentClick)
     source_list.clicked.connect(sourceClick)
 
+    clip_edit.textChanged.connect(editTextChanged)
+
+    window.hash_comment_radio.clicked.connect(hashCommentClicked)
+    window.slash_comment_radio.clicked.connect(slashCommentClicked)
+
+
+
+
+
     # root = tk.Tk()
     # app = Application(root)
     # root.mainloop()
@@ -105,16 +119,37 @@ def main():
     sys.exit(app.exec_())
 
 
+def slashCommentClicked():
+    print "clicked"
+    if(window.slash_comment_radio.isChecked()):
+        window.hash_comment_radio.setChecked(False)
+
+def hashCommentClicked():
+    print "clicked"
+    if (window.hash_comment_radio.isChecked()):
+        window.slash_comment_radio.setChecked(False)
+
+def editTextChanged():
+    content_model.item(currentIndex[-1].row(), currentIndex[-1].column()).setText(clip_edit.toPlainText())
+
+def setTextForEdit(clip):
+    window.clip_edit.setText(clip)
+
 def contentClick(index):
+    currentIndex.append(index)
+
     item = content_model.item(index.row(), index.column())
     unicode_item = unicode(item.text(), "utf-8")
     clipboard.setText(unicode_item)
+    setTextForEdit(unicode_item)
 
 
 def sourceClick(index):
     item = source_model.item(index.row(), index.column())
     unicode_item = unicode(item.text(), "utf-8")
     clipboard.setText(unicode_item)
+    setTextForEdit(unicode_item)
+
 
 
 def sourceRadioClicked(enabled):
@@ -130,7 +165,6 @@ def setModelForList():
         source_model.appendRow(source)
 
     def on_item_changed(item):
-        print "changed"
         if not item.checkState():
             return item
         print item.text()
@@ -165,23 +199,23 @@ def clipboardChanged():
     rdf = ''
 
     rc = clp.EnumClipboardFormats(0)
-    while rc:
-        try:
-            format_name = clp.GetClipboardFormatName(rc)
-        except win32api.error:
-            format_name = "?"
-        # print "format", rc, format_name
-        try:
-            format = clp.GetClipboardData(rc)
-        except win32api.error:
-            format = "?"
-
-        if (format_name == 'application/rdf+xml'):
-            rdf = format
-        print format_name
-        print format
-
-        rc = clp.EnumClipboardFormats(rc)
+    # while rc:
+    #     try:
+    #         format_name = clp.GetClipboardFormatName(rc)
+    #     except win32api.error:
+    #         format_name = "?"
+    #     # print "format", rc, format_name
+    #     try:
+    #         format = clp.GetClipboardData(rc)
+    #     except win32api.error:
+    #         format = "?"
+    #
+    #     if (format_name == 'application/rdf+xml'):
+    #         rdf = format
+    #     print format_name
+    #     print format
+    #
+    #     rc = clp.EnumClipboardFormats(rc)
 
     clp.CloseClipboard()
 
@@ -234,7 +268,12 @@ def clipboardChanged():
         setModelForList()
 
         if (source_radio.isChecked()):
-            wrap_with_comment = "hash"
+            wrap_with_comment = "none"
+            if window.hash_comment_radio.isChecked():
+                wrap_with_comment = "hash"
+            elif  window.slash_comment_radio.isChecked():
+                wrap_with_comment = "slash"
+
 
             if (wrap_with_comment == "hash"):
                 clipboard.setText(originalText + "\n" + "# Copied from:\n" + "# " + source)
