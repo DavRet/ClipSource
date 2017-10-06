@@ -10,6 +10,7 @@ import win32gui
 import win32process
 
 import wikipedia
+import bibgen
 
 from PyQt4.QtCore import QTimer
 from bs4 import BeautifulSoup
@@ -18,10 +19,18 @@ import HTMLClipboard
 import os
 import os.path
 import sys
-
+import pyapa
 import wmi
 import scandir
 import urllib
+
+import citeproc
+from citeproc import CitationStylesStyle, CitationStylesBibliography
+from citeproc import Citation, CitationItem
+from citeproc import formatter
+from citeproc.source.json import CiteProcJSON
+
+
 from lxml import html
 
 import pdfminer
@@ -50,32 +59,6 @@ import win32clipboard as clp, win32api
 # clp.CloseClipboard()
 
 c = wmi.WMI()
-
-
-def get_app_path(hwnd):
-    """Get applicatin path given hwnd."""
-    try:
-        _, pid = win32process.GetWindowThreadProcessId(hwnd)
-        for p in c.query('SELECT ExecutablePath FROM Win32_Process WHERE ProcessId = %s' % str(pid)):
-            exe = p.ExecutablePath
-            break
-    except:
-        return None
-    else:
-        return exe
-
-
-def get_app_name(hwnd):
-    """Get applicatin filename given hwnd."""
-    try:
-        _, pid = win32process.GetWindowThreadProcessId(hwnd)
-        for p in c.query('SELECT Name FROM Win32_Process WHERE ProcessId = %s' % str(pid)):
-            exe = p.Name
-            break
-    except:
-        return None
-    else:
-        return exe
 
 
 class Application:
@@ -113,7 +96,7 @@ auto_source_enabled = False
 
 last_clipboard_content_for_pdf = []
 
-wikipedia_base_url = "https://de.wikipedia.org"
+wikipedia_base_url = "https://en.wikipedia.org"
 
 
 def main():
@@ -139,6 +122,33 @@ def main():
 
     sys.exit(app.exec_())
 
+
+
+def get_app_path(hwnd):
+    """Get applicatin path given hwnd."""
+    try:
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        for p in c.query('SELECT ExecutablePath FROM Win32_Process WHERE ProcessId = %s' % str(pid)):
+            exe = p.ExecutablePath
+            break
+    except:
+        return None
+    else:
+        return exe
+
+
+def get_app_name(hwnd):
+    """Get applicatin filename given hwnd."""
+    try:
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        for p in c.query('SELECT Name FROM Win32_Process WHERE ProcessId = %s' % str(pid)):
+            exe = p.Name
+            break
+    except:
+        return None
+    else:
+        return exe
+
 def getLinkForWikiCitation(url):
     f = urllib.urlopen(url)
     soup = BeautifulSoup(f, "lxml")
@@ -154,17 +164,39 @@ def getLinkForWikiCitation(url):
             return "no link"
 
 def getWikiCitation(url):
+
     f = urllib.urlopen(url)
 
     soup = BeautifulSoup(f, "lxml")
 
-    div = soup.find("div", {"class": "plainlinks"})
+    div = soup.findAll("div", {"class": "plainlinks"})
 
-    # listItems = div.findAll("li")
-    #
-    # for item in listItems:
-    #     print item
-    return div
+    citations = {}
+
+    for item in div:
+        bibTexLaTex = item.findAll("pre")
+
+        for i in bibTexLaTex:
+            citations["BibLatex"] = i
+
+        all_text = item.findAll(text=True)
+
+        for i in range(len(all_text)):
+
+            if "APA" in all_text[i]:
+
+                apa_style = all_text[i+1] + all_text[i+2] + all_text[i+3] + all_text[i+4] + all_text[i+5] + all_text[i+6]
+
+                citations["APA"] = apa_style
+
+            if "AMA" in all_text[i]:
+                ama_style = all_text[i+1] + all_text[i+2] + all_text[i+3] + all_text[i+4] + all_text[i+5]
+                citations["AMA"] = ama_style
+    return citations
+
+
+def formatToAPA(author, created, publisher, retrieved, source):
+    print "test"
 
 def slashCommentClicked():
     if (window.slash_comment_radio.isChecked()):
