@@ -113,6 +113,8 @@ auto_source_enabled = False
 
 last_clipboard_content_for_pdf = []
 
+wikipedia_base_url = "https://de.wikipedia.org"
+
 
 def main():
 
@@ -138,7 +140,6 @@ def main():
     sys.exit(app.exec_())
 
 def getLinkForWikiCitation(url):
-    url = "https://en.wikipedia.org/wiki/Wold"
     f = urllib.urlopen(url)
     soup = BeautifulSoup(f, "lxml")
 
@@ -153,19 +154,17 @@ def getLinkForWikiCitation(url):
             return "no link"
 
 def getWikiCitation(url):
-    url = "https://en.wikipedia.org/w/index.php?title=Special:CiteThisPage&page=Clipboard"
     f = urllib.urlopen(url)
 
     soup = BeautifulSoup(f, "lxml")
-    titleList = soup.findAll('title')
 
     div = soup.find("div", {"class": "plainlinks"})
 
-    listItems = div.findAll("li")
-
-    for item in listItems:
-        print item
-    return listItems
+    # listItems = div.findAll("li")
+    #
+    # for item in listItems:
+    #     print item
+    return div
 
 def slashCommentClicked():
     if (window.slash_comment_radio.isChecked()):
@@ -326,6 +325,7 @@ def clipboardChanged():
             print "HAS HTML"
             source = HTMLClipboard.GetSource()
             print(source)
+            print getWikiCitation(wikipedia_base_url + getLinkForWikiCitation(source))
 
             if (source == None):
                 html = ""
@@ -350,6 +350,7 @@ def clipboardChanged():
                 link = soup.find('img')['src']
                 print link
                 source = link
+
 
             originalText = clipboard.text()
 
