@@ -1,15 +1,25 @@
 import sys
 import urllib2
 
+import datetime
 import exifread
 import rdflib
 import win32con
+import win32gui
+
+import win32process
+
+from PyQt4.QtCore import QTimer
 from bs4 import BeautifulSoup
 
 import HTMLClipboard
 import os
 import os.path
 import sys
+
+import wmi
+
+import scandir
 
 import pdfminer
 from pdfminer.pdfparser import PDFParser
@@ -26,7 +36,6 @@ clips = []
 
 currentIndex = []
 
-
 import pygubu
 from PyQt4 import QtGui, uic
 
@@ -37,6 +46,33 @@ import win32clipboard as clp, win32api
 # clp.SetClipboardData(0, None)
 # clp.CloseClipboard()
 
+c = wmi.WMI()
+
+
+def get_app_path(hwnd):
+    """Get applicatin path given hwnd."""
+    try:
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        for p in c.query('SELECT ExecutablePath FROM Win32_Process WHERE ProcessId = %s' % str(pid)):
+            exe = p.ExecutablePath
+            break
+    except:
+        return None
+    else:
+        return exe
+
+
+def get_app_name(hwnd):
+    """Get applicatin filename given hwnd."""
+    try:
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        for p in c.query('SELECT Name FROM Win32_Process WHERE ProcessId = %s' % str(pid)):
+            exe = p.Name
+            break
+    except:
+        return None
+    else:
+        return exe
 
 
 class Application:
@@ -72,6 +108,8 @@ clip_edit = window.clip_edit
 
 auto_source_enabled = False
 
+last_clipboard_content_for_pdf = []
+
 
 def main():
     clipboard.dataChanged.connect(clipboardChanged)
@@ -97,18 +135,22 @@ def main():
 
 
 def slashCommentClicked():
-    if(window.slash_comment_radio.isChecked()):
+    if (window.slash_comment_radio.isChecked()):
         window.hash_comment_radio.setChecked(False)
+
 
 def hashCommentClicked():
     if (window.hash_comment_radio.isChecked()):
         window.slash_comment_radio.setChecked(False)
 
+
 def editTextChanged():
     content_model.item(currentIndex[-1].row(), currentIndex[-1].column()).setText(clip_edit.toPlainText())
 
+
 def setTextForEdit(clip):
     window.clip_edit.setText(clip)
+
 
 def contentClick(index):
     currentIndex.append(index)
@@ -124,7 +166,6 @@ def sourceClick(index):
     unicode_item = unicode(item.text(), "utf-8")
     clipboard.setText(unicode_item)
     setTextForEdit(unicode_item)
-
 
 
 def sourceRadioClicked(enabled):
@@ -163,140 +204,222 @@ def buttonClick():
 
 
 def clipboardChanged():
-    mimeData = clipboard.mimeData()
+    window = win32gui.GetWindowText(win32gui.GetForegroundWindow())
 
-    print "copied"
+    app_name = get_app_name(win32gui.GetForegroundWindow())
+    mimeData = clipboard.mimeData()
 
     print clipboard.text()
 
-    clp.OpenClipboard(None)
-
-    rdf = ''
-
-    rc = clp.EnumClipboardFormats(0)
-    while rc:
-        try:
-            format_name = clp.GetClipboardFormatName(rc)
-        except win32api.error:
-            format_name = "?"
-        # print "format", rc, format_name
-        try:
-            format = clp.GetClipboardData(rc)
-        except win32api.error:
-            format = "?"
-
-        if (format_name == 'application/rdf+xml'):
-            rdf = format
-        print format_name
-        print format
-
-        rc = clp.EnumClipboardFormats(rc)
-
-    clp.CloseClipboard()
-
-    print rdf
 
 
-    # credit = Credit(rdf, "https://labs.creativecommons.org/2011/ccrel-guide/examples/image.html")
-    # #
-    # print str(credit)
-    # formattter = TextCreditFormatter()
-    # credit.format(formattter)
-    # #
-    # print formattter.get_text()
-    if HTMLClipboard.HasHtml():
-        print "HAS HTML"
-        source = HTMLClipboard.GetSource()
-        print(source)
+    if ".pdf" in window:
+        last_clipboard_content_for_pdf.append(clipboard.text())
+        if (len(last_clipboard_content_for_pdf) % 5 == 0):
+            print "IS PDF"
+            pdf_title = window.split(" - ", 1)[0]
+            pdf_path = find(pdf_title, "C:\Users\David\Desktop")
+            fp = open(pdf_path, 'rb')
+            parser = PDFParser(fp)
+            doc = PDFDocument(parser)
 
-        if (source == None):
-            html = ""
+            if 'Author' in doc.info[0]:
+                author = doc.info[0]['Author']
+            else:
+                author = "No Author found"
+            if 'Title' in doc.info[0]:
+                title = doc.info[0]['Title']
+            else:
+                title = "No Title found"
+            if 'CreationDate' in doc.info[0]:
+                created = doc.info[0]['CreationDate']
+            else:
+                created = "No Date found"
+            if 'Keywords' in doc.info[0]:
+                keywords = doc.info[0]['Keywords']
+            else:
+                keywords = "No Keywords found"
+
+            new_date = created.split(":", 1)[1]
+            year = new_date[:4]
+            month = new_date[4:][:2]
+            day = new_date[6:][:2]
+
+            date = datetime.date(int(year), int(month), int(day))
+
+            # clp.OpenClipboard()
+            #
+            # clp.SetClipboardData(win32con.CF_TEXT, clp.GetClipboardData() + "\n" + "Title: " + title
+            #                      + "\n" + "Author: " + author + "\n" + "Created: " + str(date) + "\n" +
+            #                      "Keywords: " + keywords)
+            # clp.CloseClipboard()
+
+            clipboard.setText(clipboard.text() + "\n" + "Title: " + title
+                                 + "\n" + "Authors: " + author + "\n" + "Date: " + str(date) + "\n" +
+                                 "Keywords: " + keywords)
+
+        # clp.OpenClipboard(None)
+        # #
+        # # rdf = ''
+        # #
+        # rc = clp.EnumClipboardFormats(0)
+        # while rc:
+        #     try:
+        #         format_name = clp.GetClipboardFormatName(rc)
+        #     except win32api.error:
+        #         format_name = "?"
+        #     # print "format", rc, format_name
+        #     try:
+        #         format = clp.GetClipboardData(rc)
+        #     except win32api.error:
+        #         format = "?"
+        #
+        #     if (format_name == 'application/rdf+xml'):
+        #         rdf = format
+        #     print format_name
+        #     print format
+        #
+        #     rc = clp.EnumClipboardFormats(rc)
+        #
+        # clp.CloseClipboard()
+
+
+    else:
+
+        # clp.OpenClipboard(None)
+        #
+        # rdf = ''
+        #
+        # rc = clp.EnumClipboardFormats(0)
+        # while rc:
+        #     try:
+        #         format_name = clp.GetClipboardFormatName(rc)
+        #     except win32api.error:
+        #         format_name = "?"
+        #     # print "format", rc, format_name
+        #     try:
+        #         format = clp.GetClipboardData(rc)
+        #     except win32api.error:
+        #         format = "?"
+        #
+        #     if (format_name == 'application/rdf+xml'):
+        #         rdf = format
+        #     print format_name
+        #     print format
+        #
+        #     rc = clp.EnumClipboardFormats(rc)
+        #
+        # clp.CloseClipboard()
+        #
+        # print rdf
+
+
+        # credit = Credit(rdf, "https://labs.creativecommons.org/2011/ccrel-guide/examples/image.html")
+        # #
+        # print str(credit)
+        # formattter = TextCreditFormatter()
+        # credit.format(formattter)
+        # #
+        # print formattter.get_text()
+        if HTMLClipboard.HasHtml():
+            print "HAS HTML"
+            source = HTMLClipboard.GetSource()
+            print(source)
+
+            if (source == None):
+                html = ""
+                clp.OpenClipboard(None)
+                rc = clp.EnumClipboardFormats(0)
+                while rc:
+                    try:
+                        format_name = clp.GetClipboardFormatName(rc)
+                    except win32api.error:
+                        format_name = "?"
+                    try:
+                        format = clp.GetClipboardData(rc)
+                    except win32api.error:
+                        format = "?"
+                    if (format_name == "HTML Format"):
+                        html = format
+                    rc = clp.EnumClipboardFormats(rc)
+
+                clp.CloseClipboard()
+                soup = BeautifulSoup(html, "html.parser")
+
+                link = soup.find('img')['src']
+                print link
+                source = link
+
+            originalText = clipboard.text()
+
+            if originalText == None or originalText == "":
+                originalText = "Image"
+
+            clips.append(tuple((originalText, source)))
+
+            setModelForList()
+
+            if (source_radio.isChecked()):
+                wrap_with_comment = "none"
+                if window.hash_comment_radio.isChecked():
+                    wrap_with_comment = "hash"
+                elif window.slash_comment_radio.isChecked():
+                    wrap_with_comment = "slash"
+
+                if (wrap_with_comment == "hash"):
+                    clipboard.setText(originalText + "\n" + "# Copied from:\n" + "# " + source)
+                elif (wrap_with_comment == "slash"):
+                    clipboard.setText(originalText + "\n" + "// Copied from:\n" + "// " + source)
+                else:
+                    clipboard.setText(originalText + "\n" + "Copied from:\n" + source)
+
+            print clipboard.text()
+        else:
             clp.OpenClipboard(None)
+
             rc = clp.EnumClipboardFormats(0)
             while rc:
                 try:
                     format_name = clp.GetClipboardFormatName(rc)
                 except win32api.error:
                     format_name = "?"
+                # print "format", rc, format_name
                 try:
                     format = clp.GetClipboardData(rc)
                 except win32api.error:
                     format = "?"
-                if (format_name == "HTML Format"):
-                    html = format
+                if (format_name == '?'):
+                    if (len(format) > 0):
+                        print "File Source Path: \n", format[0]
+
+                        path = format[0]
+
+                        if (path[-4:] == '.pdf'):
+                            fp = open(path, 'rb')
+                            parser = PDFParser(fp)
+                            doc = PDFDocument(parser)
+
+                            print doc.info
+
                 rc = clp.EnumClipboardFormats(rc)
 
             clp.CloseClipboard()
-            soup = BeautifulSoup(html, "html.parser")
 
-            link = soup.find('img')['src']
-            print link
-            source = link
+        soup = BeautifulSoup(mimeData.html(), "html.parser")
 
-        originalText = clipboard.text()
+        links = soup.find_all('a')
 
-        if originalText == None or originalText == "":
-            originalText = "Image"
-
-        clips.append(tuple((originalText, source)))
-
-        setModelForList()
-
-        if (source_radio.isChecked()):
-            wrap_with_comment = "none"
-            if window.hash_comment_radio.isChecked():
-                wrap_with_comment = "hash"
-            elif  window.slash_comment_radio.isChecked():
-                wrap_with_comment = "slash"
+        # print links
+        for tag in links:
+            link = tag.get('href', None)
+            if link is not None:
+                print link
 
 
-            if (wrap_with_comment == "hash"):
-                clipboard.setText(originalText + "\n" + "# Copied from:\n" + "# " + source)
-            elif (wrap_with_comment == "slash"):
-                clipboard.setText(originalText + "\n" + "// Copied from:\n" + "// " + source)
-            else:
-                clipboard.setText(originalText + "\n" + "Copied from:\n" + source)
-
-        print clipboard.text()
-    else:
-        clp.OpenClipboard(None)
-
-        rc = clp.EnumClipboardFormats(0)
-        while rc:
-            try:
-                format_name = clp.GetClipboardFormatName(rc)
-            except win32api.error:
-                format_name = "?"
-            # print "format", rc, format_name
-            try:
-                format = clp.GetClipboardData(rc)
-            except win32api.error:
-                format = "?"
-            if (format_name == '?'):
-                print "File Source Path: \n", format[0]
-
-                path = format[0]
-
-                if(path[-4:] == '.pdf'):
-                    fp = open(path, 'rb')
-                    parser = PDFParser(fp)
-                    doc = PDFDocument(parser)
-
-                    print doc.info  # The "Info" metadata
-
-            rc = clp.EnumClipboardFormats(rc)
-
-        clp.CloseClipboard()
-
-    soup = BeautifulSoup(mimeData.html(), "html.parser")
-
-    links = soup.find_all('a')
-
-    # print links
-    for tag in links:
-        link = tag.get('href', None)
-        if link is not None:
-            print link
+def find(name, path):
+    for root, dirs, files in scandir.walk(path):
+        if name in files:
+            return os.path.join(root, name)
 
 
 if __name__ == '__main__':
