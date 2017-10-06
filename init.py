@@ -11,6 +11,10 @@ import os
 import os.path
 import sys
 
+import pdfminer
+from pdfminer.pdfparser import PDFParser
+from pdfminer.pdfdocument import PDFDocument
+
 from libcredit import Credit, HTMLCreditFormatter, TextCreditFormatter
 
 from PySide import QtGui, QtCore
@@ -33,23 +37,6 @@ import win32clipboard as clp, win32api
 # clp.SetClipboardData(0, None)
 # clp.CloseClipboard()
 
-# clp.OpenClipboard(None)
-# rc = clp.EnumClipboardFormats(0)
-# while rc:
-#     try:
-#         format_name = clp.GetClipboardFormatName(rc)
-#     except win32api.error:
-#         format_name = "?"
-#
-#     print format_name
-#     try:
-#         format = clp.GetClipboardData(rc)
-#     except win32api.error:
-#         format = "?"
-#     print format
-#     rc = clp.EnumClipboardFormats(rc)
-#
-# clp.CloseClipboard()
 
 
 class Application:
@@ -106,26 +93,14 @@ def main():
     window.hash_comment_radio.clicked.connect(hashCommentClicked)
     window.slash_comment_radio.clicked.connect(slashCommentClicked)
 
-
-
-
-
-    # root = tk.Tk()
-    # app = Application(root)
-    # root.mainloop()
-
-
-
     sys.exit(app.exec_())
 
 
 def slashCommentClicked():
-    print "clicked"
     if(window.slash_comment_radio.isChecked()):
         window.hash_comment_radio.setChecked(False)
 
 def hashCommentClicked():
-    print "clicked"
     if (window.hash_comment_radio.isChecked()):
         window.slash_comment_radio.setChecked(False)
 
@@ -199,30 +174,30 @@ def clipboardChanged():
     rdf = ''
 
     rc = clp.EnumClipboardFormats(0)
-    # while rc:
-    #     try:
-    #         format_name = clp.GetClipboardFormatName(rc)
-    #     except win32api.error:
-    #         format_name = "?"
-    #     # print "format", rc, format_name
-    #     try:
-    #         format = clp.GetClipboardData(rc)
-    #     except win32api.error:
-    #         format = "?"
-    #
-    #     if (format_name == 'application/rdf+xml'):
-    #         rdf = format
-    #     print format_name
-    #     print format
-    #
-    #     rc = clp.EnumClipboardFormats(rc)
+    while rc:
+        try:
+            format_name = clp.GetClipboardFormatName(rc)
+        except win32api.error:
+            format_name = "?"
+        # print "format", rc, format_name
+        try:
+            format = clp.GetClipboardData(rc)
+        except win32api.error:
+            format = "?"
+
+        if (format_name == 'application/rdf+xml'):
+            rdf = format
+        print format_name
+        print format
+
+        rc = clp.EnumClipboardFormats(rc)
 
     clp.CloseClipboard()
 
     print rdf
 
 
-    #credit = Credit(rdf, "https://labs.creativecommons.org/2011/ccrel-guide/examples/image.html")
+    # credit = Credit(rdf, "https://labs.creativecommons.org/2011/ccrel-guide/examples/image.html")
     # #
     # print str(credit)
     # formattter = TextCreditFormatter()
@@ -297,8 +272,18 @@ def clipboardChanged():
                 format = clp.GetClipboardData(rc)
             except win32api.error:
                 format = "?"
-            if (format_name == 'FileNameW'):
-                print "File Source Path: \n", format
+            if (format_name == '?'):
+                print "File Source Path: \n", format[0]
+
+                path = format[0]
+
+                if(path[-4:] == '.pdf'):
+                    fp = open(path, 'rb')
+                    parser = PDFParser(fp)
+                    doc = PDFDocument(parser)
+
+                    print doc.info  # The "Info" metadata
+
             rc = clp.EnumClipboardFormats(rc)
 
         clp.CloseClipboard()
