@@ -9,6 +9,8 @@ import win32gui
 
 import win32process
 
+import wikipedia
+
 from PyQt4.QtCore import QTimer
 from bs4 import BeautifulSoup
 
@@ -18,8 +20,9 @@ import os.path
 import sys
 
 import wmi
-
 import scandir
+import urllib
+from lxml import html
 
 import pdfminer
 from pdfminer.pdfparser import PDFParser
@@ -112,6 +115,7 @@ last_clipboard_content_for_pdf = []
 
 
 def main():
+
     clipboard.dataChanged.connect(clipboardChanged)
 
     content_list.setModel(content_model)
@@ -133,6 +137,35 @@ def main():
 
     sys.exit(app.exec_())
 
+def getLinkForWikiCitation(url):
+    url = "https://en.wikipedia.org/wiki/Wold"
+    f = urllib.urlopen(url)
+    soup = BeautifulSoup(f, "lxml")
+
+    citeUrl = soup.find('li', attrs={'id': 't-cite'})
+
+    for tag in citeUrl:
+        link = tag.get('href', None)
+        if link is not None:
+            print link
+            return link
+        else:
+            return "no link"
+
+def getWikiCitation(url):
+    url = "https://en.wikipedia.org/w/index.php?title=Special:CiteThisPage&page=Clipboard"
+    f = urllib.urlopen(url)
+
+    soup = BeautifulSoup(f, "lxml")
+    titleList = soup.findAll('title')
+
+    div = soup.find("div", {"class": "plainlinks"})
+
+    listItems = div.findAll("li")
+
+    for item in listItems:
+        print item
+    return listItems
 
 def slashCommentClicked():
     if (window.slash_comment_radio.isChecked()):
@@ -247,42 +280,10 @@ def clipboardChanged():
 
             date = datetime.date(int(year), int(month), int(day))
 
-            # clp.OpenClipboard()
-            #
-            # clp.SetClipboardData(win32con.CF_TEXT, clp.GetClipboardData() + "\n" + "Title: " + title
-            #                      + "\n" + "Author: " + author + "\n" + "Created: " + str(date) + "\n" +
-            #                      "Keywords: " + keywords)
-            # clp.CloseClipboard()
 
             clipboard.setText(clipboard.text() + "\n" + "Title: " + title
                                  + "\n" + "Authors: " + author + "\n" + "Date: " + str(date) + "\n" +
                                  "Keywords: " + keywords)
-
-        # clp.OpenClipboard(None)
-        # #
-        # # rdf = ''
-        # #
-        # rc = clp.EnumClipboardFormats(0)
-        # while rc:
-        #     try:
-        #         format_name = clp.GetClipboardFormatName(rc)
-        #     except win32api.error:
-        #         format_name = "?"
-        #     # print "format", rc, format_name
-        #     try:
-        #         format = clp.GetClipboardData(rc)
-        #     except win32api.error:
-        #         format = "?"
-        #
-        #     if (format_name == 'application/rdf+xml'):
-        #         rdf = format
-        #     print format_name
-        #     print format
-        #
-        #     rc = clp.EnumClipboardFormats(rc)
-        #
-        # clp.CloseClipboard()
-
 
     else:
 
