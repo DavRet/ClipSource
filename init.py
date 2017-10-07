@@ -187,11 +187,11 @@ def getWikiCitation(url):
 
                 apa_style = all_text[i+1] + all_text[i+2] + all_text[i+3] + all_text[i+4] + all_text[i+5] + all_text[i+6]
 
-                citations["APA"] = apa_style
+                citations["APA"] = apa_style.strip('\n')
 
             if "AMA" in all_text[i]:
-                ama_style = all_text[i+1] + all_text[i+2] + all_text[i+3] + all_text[i+4] + all_text[i+5]
-                citations["AMA"] = ama_style
+                ama_style = all_text[i+2] + all_text[i+3] + all_text[i+4] + all_text[i+5]
+                citations["AMA"] = ama_style.strip('\n')
     return citations
 
 
@@ -296,6 +296,34 @@ def getGettyImageMetadata(source):
 
     return meta_data
 
+    # def _renderClipboardFormat(self, textDict, format):
+    #     """
+    #     Interprets a given clipboard format code and returns contents
+    #     rendered into the corresponding format, and explicitly
+    #     terminated with null bytes: in other words, the text returned
+    #     from this function is ready to be put into the Windows
+    #     Clipboard.
+    #       """
+    #     # Precondition:
+    #     assert (format in [CF_TEXT, CF_UNICODETEXT, CF_HTML])
+    #
+    #     if format == CF_TEXT:
+    #         text = _textDictToAscii(textDict)
+    #         terminator = "\0"
+    #     elif format == CF_UNICODETEXT:
+    #         # For CF_UNICODETEXT we must provide double-null-terminated
+    #         # Utf-16:
+    #         text = _textDictToUtf16(textDict)
+    #         terminator = "\0\0"
+    #     elif format == CF_HTML:
+    #         text = _textDictToClipboardHtml(textDict)
+    #         # No terminator should be used on clipboard html format.
+    #         terminator = ""
+    #
+    #     result = text + terminator
+    #     # Postcondition:
+    #     assert (type(result) == str)
+    #     return result
 
 def clipboardChanged():
     window = win32gui.GetWindowText(win32gui.GetForegroundWindow())
@@ -388,8 +416,31 @@ def clipboardChanged():
             source = HTMLClipboard.GetSource()
             print(source)
             if "wikipedia" in window.lower():
-                print getWikiCitation(wikipedia_base_url + getLinkForWikiCitation(source))
+                wiki_citation = getWikiCitation(wikipedia_base_url + getLinkForWikiCitation(source))
+                print wiki_citation
+                clp.OpenClipboard(None)
+                citation_format = clp.RegisterClipboardFormat("CITATIONS")
 
+                clp.SetClipboardData(citation_format, unicode(wiki_citation))
+
+                rc = clp.EnumClipboardFormats(0)
+                while rc:
+                    try:
+                        format_name = clp.GetClipboardFormatName(rc)
+                    except win32api.error:
+                        format_name = "?"
+                    # print "format", rc, format_name
+                    try:
+                        format = clp.GetClipboardData(rc)
+                    except win32api.error:
+                        format = "?"
+
+                    print format_name
+                    print format
+
+                    rc = clp.EnumClipboardFormats(rc)
+
+                clp.CloseClipboard()
 
 
 
