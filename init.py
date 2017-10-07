@@ -267,6 +267,36 @@ def buttonClick():
     print "click"
 
 
+def getGettyImageMetadata(source):
+    meta_data = []
+    if "media" in source:
+        print "MEDIA"+source
+        first_link_fragment = "http://www.gettyimages.de/detail/foto/"
+        name_and_id = source.split("/", 4)[4]
+        print name_and_id.split("-picture-", 2)
+        name = name_and_id.split("-picture-", 2)[0]
+        id = name_and_id.split("-picture-", 2)[1].split("id", 2)[1]
+        url = first_link_fragment + name + "-lizenzfreies-bild/" +  id
+
+        print url
+
+        f = urllib.urlopen(url)
+        soup = BeautifulSoup(f, "lxml")
+
+        description = soup.find("meta", itemprop="description")
+
+        for meta_data_item in soup.findAll("meta"):
+            meta_data.append(meta_data_item)
+    else:
+        f = urllib.urlopen(source)
+        soup = BeautifulSoup(f, "lxml")
+
+        for meta_data_item in soup.findAll("meta"):
+            meta_data.append(meta_data_item)
+
+    return meta_data
+
+
 def clipboardChanged():
     window = win32gui.GetWindowText(win32gui.GetForegroundWindow())
 
@@ -357,7 +387,11 @@ def clipboardChanged():
             print "HAS HTML"
             source = HTMLClipboard.GetSource()
             print(source)
-            print getWikiCitation(wikipedia_base_url + getLinkForWikiCitation(source))
+            if "wikipedia" in window.lower():
+                print getWikiCitation(wikipedia_base_url + getLinkForWikiCitation(source))
+
+
+
 
             if (source == None):
                 html = ""
@@ -382,6 +416,9 @@ def clipboardChanged():
                 link = soup.find('img')['src']
                 print link
                 source = link
+
+            if "getty" in window.lower():
+                print getGettyImageMetadata(source)
 
 
             originalText = clipboard.text()
@@ -439,15 +476,15 @@ def clipboardChanged():
 
             clp.CloseClipboard()
 
-        soup = BeautifulSoup(mimeData.html(), "html.parser")
-
-        links = soup.find_all('a')
-
-        # print links
-        for tag in links:
-            link = tag.get('href', None)
-            if link is not None:
-                print link
+        # soup = BeautifulSoup(mimeData.html(), "html.parser")
+        #
+        # links = soup.find_all('a')
+        #
+        # # print links
+        # for tag in links:
+        #     link = tag.get('href', None)
+        #     if link is not None:
+        #         print link
 
 
 def find(name, path):
