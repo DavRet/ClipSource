@@ -387,72 +387,24 @@ def getAllClipboardFormats():
 def clipboardChanged():
     print "CLIPBOARD CHANGED"
 
-    window = win32gui.GetWindowText(win32gui.GetForegroundWindow())
+    current_window = win32gui.GetWindowText(win32gui.GetForegroundWindow())
 
     app_name = get_app_name(win32gui.GetForegroundWindow())
     mimeData = clipboard.mimeData()
 
 
-    if ".pdf" in window:
+    if ".pdf" in current_window:
         last_clipboard_content_for_pdf.append(clipboard.text())
         if (len(last_clipboard_content_for_pdf) % 5 == 0):
-            pdf_title = window.split(" - ", 1)[0]
-            pdf_path = find(pdf_title, "C:\Users\David\Desktop")
-            fp = open(pdf_path, 'rb')
-            parser = PDFParser(fp)
-            doc = PDFDocument(parser)
-
-            if 'Author' in doc.info[0]:
-                author = doc.info[0]['Author']
-            else:
-                author = "No Author found"
-            if 'Title' in doc.info[0]:
-                title = doc.info[0]['Title']
-            else:
-                title = "No Title found"
-            if 'CreationDate' in doc.info[0]:
-                created = doc.info[0]['CreationDate']
-            else:
-                created = "No Date found"
-            if 'Keywords' in doc.info[0]:
-                keywords = doc.info[0]['Keywords']
-            else:
-                keywords = "No Keywords found"
-
-            new_date = created.split(":", 1)[1]
-            year = new_date[:4]
-            month = new_date[4:][:2]
-            day = new_date[6:][:2]
-
-            date = datetime.date(int(year), int(month), int(day))
-
-            data_for_clipboard = {"Title": title, "Author": author, "Date": str(date), "Keywords": keywords}
-
-            clp.OpenClipboard(None)
-
-            clp.SetClipboardData(metadata_format, unicode(data_for_clipboard))
-            clp.SetClipboardData(src_format, unicode(pdf_path))
-
-            print clp.GetClipboardData(metadata_format)
-            clp.CloseClipboard()
-
+            getPdfMetaData(current_window)
             return
-
-
     else:
         if HTMLClipboard.HasHtml():
             source = HTMLClipboard.GetSource()
+            print source
 
-            if "wikipedia" in window.lower():
-                wiki_citation = getWikiCitation(wikipedia_base_url + getLinkForWikiCitation(source))
-                clp.OpenClipboard(None)
-
-                clp.SetClipboardData(citation_format, unicode(wiki_citation))
-                clp.SetClipboardData(src_format, unicode(source))
-
-                print clp.GetClipboardData(citation_format)
-
-                clp.CloseClipboard()
+            if "wikipedia" in current_window.lower():
+                putWikiCitationToClipboard(source)
                 return
 
             if (source == None):
@@ -479,7 +431,7 @@ def clipboardChanged():
                 print link
                 source = link
 
-                if "getty" in window.lower():
+                if "getty" in current_window.lower():
                     meta_data = getGettyImageMetadata(source)
 
                     clp.OpenClipboard(None)
@@ -524,6 +476,58 @@ def clipboardChanged():
             print clipboard.text()
         else:
            checkForFile()
+
+def putWikiCitationToClipboard(source):
+    wiki_citation = getWikiCitation(wikipedia_base_url + getLinkForWikiCitation(source))
+    clp.OpenClipboard(None)
+
+    clp.SetClipboardData(citation_format, unicode(wiki_citation))
+    clp.SetClipboardData(src_format, unicode(source))
+
+    print clp.GetClipboardData(citation_format)
+
+    clp.CloseClipboard()
+
+def getPdfMetaData(current_window):
+    pdf_title = current_window.split(" - ", 1)[0]
+    pdf_path = find(pdf_title, "C:\Users\David\Desktop")
+    fp = open(pdf_path, 'rb')
+    parser = PDFParser(fp)
+    doc = PDFDocument(parser)
+
+    if 'Author' in doc.info[0]:
+        author = doc.info[0]['Author']
+    else:
+        author = "No Author found"
+    if 'Title' in doc.info[0]:
+        title = doc.info[0]['Title']
+    else:
+        title = "No Title found"
+    if 'CreationDate' in doc.info[0]:
+        created = doc.info[0]['CreationDate']
+    else:
+        created = "No Date found"
+    if 'Keywords' in doc.info[0]:
+        keywords = doc.info[0]['Keywords']
+    else:
+        keywords = "No Keywords found"
+
+    new_date = created.split(":", 1)[1]
+    year = new_date[:4]
+    month = new_date[4:][:2]
+    day = new_date[6:][:2]
+
+    date = datetime.date(int(year), int(month), int(day))
+
+    data_for_clipboard = {"Title": title, "Author": author, "Date": str(date), "Keywords": keywords}
+
+    clp.OpenClipboard(None)
+
+    clp.SetClipboardData(metadata_format, unicode(data_for_clipboard))
+    clp.SetClipboardData(src_format, unicode(pdf_path))
+
+    print clp.GetClipboardData(metadata_format)
+    clp.CloseClipboard()
 
 def checkForFile():
     clp.OpenClipboard(None)
