@@ -2,7 +2,10 @@ import sys
 import urllib2
 
 import datetime
+from ctypes import byref
+
 import exifread
+import pythoncom
 import rdflib
 import win32con
 import win32gui
@@ -11,7 +14,9 @@ import win32process
 
 import wikipedia
 import bibgen
+import win32event
 
+import win32ui
 from PyQt4.QtCore import QTimer
 from bs4 import BeautifulSoup
 
@@ -53,10 +58,8 @@ from PyQt4 import QtGui, uic
 
 import win32clipboard as clp, win32api
 
-# clp.OpenClipboard(0)
-# clp.EmptyClipboard()
-# clp.SetClipboardData(0, None)
-# clp.CloseClipboard()
+import pyHook
+
 
 c = wmi.WMI()
 
@@ -98,6 +101,10 @@ last_clipboard_content_for_pdf = []
 
 wikipedia_base_url = "https://en.wikipedia.org"
 
+citation_format = clp.RegisterClipboardFormat("CITATIONS")
+src_format = clp.RegisterClipboardFormat("SOURCE")
+metadata_format = clp.RegisterClipboardFormat("METADATA")
+
 
 def main():
 
@@ -120,9 +127,72 @@ def main():
     window.hash_comment_radio.clicked.connect(hashCommentClicked)
     window.slash_comment_radio.clicked.connect(slashCommentClicked)
 
+    # clp.OpenClipboard()
+    # clp.EmptyClipboard()
+    # clp.SetClipboardData(clp.CF_TEXT, None)
+    # clp.CloseClipboard()
+
+    # while True:
+    #     msg = win32gui.GetMessage(0, 0, 0)
+    #     print str(msg)
+
+
+    # while True:
+    #     rc = win32event.MsgWaitForMultipleObjects(
+    #         (StopEvent, OtherEvent),
+    #         0,  # wait for all = false
+    #         TIMEOUT,  # (or win32event.INFINITE)
+    #         win32event.QS_ALLEVENTS)
+    #     print rc
+    #     # your code here
+    #     pythoncom.PumpWaitingMessages()
+
     sys.exit(app.exec_())
 
-
+# TIMEOUT = 100 # ms
+#
+# StopEvent = win32event.CreateEvent(None, 0, 0, None)
+# OtherEvent = win32event.CreateEvent(None, 0, 0, None)
+#
+# def _MessagePump():
+#     while 1:
+#
+#         rc = win32event.MsgWaitForMultipleObjects(
+#             (StopEvent, OtherEvent),
+#             0,  # wait for all = false
+#             TIMEOUT,  # (or win32event.INFINITE)
+#             win32event.QS_ALLEVENTS)  # type of input
+#
+#
+#         # You can call a function here if it doesn't take too long.
+#         #   It will get executed *at least* every 200ms -- possibly
+#         #   a lot more, depending on the number of windows messages received.
+#
+#         if rc == win32event.WAIT_OBJECT_0:
+#             # Our first event listed was triggered.
+#             # Someone wants us to exit.
+#             break
+#         elif rc == win32event.WAIT_OBJECT_0 + 1:
+#             print ""
+#         # Our second event "OtherEvent" listed was set.
+#         # This is from some other component -
+#         #   wait on as many events as you need
+#         elif rc == win32event.WAIT_OBJECT_0 + 2:
+#             print rc
+#             # A windows message is waiting - take care of it.
+#             # (Don't ask me why a WAIT_OBJECT_MSG isn't defined < WAIT_OBJECT_0)
+#             # Note: this must be done for COM and other windowsy
+#             #   things to work.
+#             if pythoncom.PumpWaitingMessages():
+#                 break  # wm_quit
+#         elif rc == win32event.WAIT_TIMEOUT:
+#             # Our timeout has elapsed.
+#             # Do some work here (e.g, poll something can you can't thread)
+#             #   or just feel good to be alive.
+#             # Good place to call watchdog(). (Editor's note: See my "thread lifetime" recepie.)
+#             pass
+#         else:
+#             raise RuntimeError("unexpected win32wait return value")
 
 def get_app_path(hwnd):
     """Get applicatin path given hwnd."""
@@ -148,6 +218,7 @@ def get_app_name(hwnd):
         return None
     else:
         return exe
+
 
 def getLinkForWikiCitation(url):
     f = urllib.urlopen(url)
@@ -296,49 +367,35 @@ def getGettyImageMetadata(source):
 
     return meta_data
 
-    # def _renderClipboardFormat(self, textDict, format):
-    #     """
-    #     Interprets a given clipboard format code and returns contents
-    #     rendered into the corresponding format, and explicitly
-    #     terminated with null bytes: in other words, the text returned
-    #     from this function is ready to be put into the Windows
-    #     Clipboard.
-    #       """
-    #     # Precondition:
-    #     assert (format in [CF_TEXT, CF_UNICODETEXT, CF_HTML])
-    #
-    #     if format == CF_TEXT:
-    #         text = _textDictToAscii(textDict)
-    #         terminator = "\0"
-    #     elif format == CF_UNICODETEXT:
-    #         # For CF_UNICODETEXT we must provide double-null-terminated
-    #         # Utf-16:
-    #         text = _textDictToUtf16(textDict)
-    #         terminator = "\0\0"
-    #     elif format == CF_HTML:
-    #         text = _textDictToClipboardHtml(textDict)
-    #         # No terminator should be used on clipboard html format.
-    #         terminator = ""
-    #
-    #     result = text + terminator
-    #     # Postcondition:
-    #     assert (type(result) == str)
-    #     return result
+def getAllClipboardFormats():
+    clp.OpenClipboard(None)
+    rc = clp.EnumClipboardFormats(0)
+    while rc:
+        try:
+            format_name = clp.GetClipboardFormatName(rc)
+        except win32api.error:
+            format_name = "?"
+        try:
+            format = clp.GetClipboardData(rc)
+        except win32api.error:
+            format = "?"
+        print format_name
+        print format
+        rc = clp.EnumClipboardFormats(rc)
+    clp.CloseClipboard()
 
 def clipboardChanged():
+    print "CLIPBOARD CHANGED"
+
     window = win32gui.GetWindowText(win32gui.GetForegroundWindow())
 
     app_name = get_app_name(win32gui.GetForegroundWindow())
     mimeData = clipboard.mimeData()
 
-    print clipboard.text()
-
-
 
     if ".pdf" in window:
         last_clipboard_content_for_pdf.append(clipboard.text())
         if (len(last_clipboard_content_for_pdf) % 5 == 0):
-            print "IS PDF"
             pdf_title = window.split(" - ", 1)[0]
             pdf_path = find(pdf_title, "C:\Users\David\Desktop")
             fp = open(pdf_path, 'rb')
@@ -369,80 +426,34 @@ def clipboardChanged():
 
             date = datetime.date(int(year), int(month), int(day))
 
+            data_for_clipboard = {"Title": title, "Author": author, "Date": str(date), "Keywords": keywords}
 
-            clipboard.setText(clipboard.text() + "\n" + "Title: " + title
-                                 + "\n" + "Authors: " + author + "\n" + "Date: " + str(date) + "\n" +
-                                 "Keywords: " + keywords)
+            clp.OpenClipboard(None)
+
+            clp.SetClipboardData(metadata_format, unicode(data_for_clipboard))
+            clp.SetClipboardData(src_format, unicode(pdf_path))
+
+            print clp.GetClipboardData(metadata_format)
+            clp.CloseClipboard()
+
+            return
+
 
     else:
-
-        # clp.OpenClipboard(None)
-        #
-        # rdf = ''
-        #
-        # rc = clp.EnumClipboardFormats(0)
-        # while rc:
-        #     try:
-        #         format_name = clp.GetClipboardFormatName(rc)
-        #     except win32api.error:
-        #         format_name = "?"
-        #     # print "format", rc, format_name
-        #     try:
-        #         format = clp.GetClipboardData(rc)
-        #     except win32api.error:
-        #         format = "?"
-        #
-        #     if (format_name == 'application/rdf+xml'):
-        #         rdf = format
-        #     print format_name
-        #     print format
-        #
-        #     rc = clp.EnumClipboardFormats(rc)
-        #
-        # clp.CloseClipboard()
-        #
-        # print rdf
-
-
-        # credit = Credit(rdf, "https://labs.creativecommons.org/2011/ccrel-guide/examples/image.html")
-        # #
-        # print str(credit)
-        # formattter = TextCreditFormatter()
-        # credit.format(formattter)
-        # #
-        # print formattter.get_text()
         if HTMLClipboard.HasHtml():
-            print "HAS HTML"
             source = HTMLClipboard.GetSource()
-            print(source)
+
             if "wikipedia" in window.lower():
                 wiki_citation = getWikiCitation(wikipedia_base_url + getLinkForWikiCitation(source))
-                print wiki_citation
                 clp.OpenClipboard(None)
-                citation_format = clp.RegisterClipboardFormat("CITATIONS")
 
                 clp.SetClipboardData(citation_format, unicode(wiki_citation))
+                clp.SetClipboardData(src_format, unicode(source))
 
-                rc = clp.EnumClipboardFormats(0)
-                while rc:
-                    try:
-                        format_name = clp.GetClipboardFormatName(rc)
-                    except win32api.error:
-                        format_name = "?"
-                    # print "format", rc, format_name
-                    try:
-                        format = clp.GetClipboardData(rc)
-                    except win32api.error:
-                        format = "?"
-
-                    print format_name
-                    print format
-
-                    rc = clp.EnumClipboardFormats(rc)
+                print clp.GetClipboardData(citation_format)
 
                 clp.CloseClipboard()
-
-
+                return
 
             if (source == None):
                 html = ""
@@ -468,8 +479,23 @@ def clipboardChanged():
                 print link
                 source = link
 
-            if "getty" in window.lower():
-                print getGettyImageMetadata(source)
+                if "getty" in window.lower():
+                    meta_data = getGettyImageMetadata(source)
+
+                    clp.OpenClipboard(None)
+                    clp.SetClipboardData(metadata_format, unicode(meta_data))
+                    clp.SetClipboardData(src_format, unicode(source))
+
+                    print clp.GetClipboardData(metadata_format)
+
+                    clp.CloseClipboard()
+                else:
+                    clp.OpenClipboard(None)
+                    clp.SetClipboardData(src_format, unicode(source))
+
+                    print clp.GetClipboardData(src_format)
+
+                    clp.CloseClipboard()
 
 
             originalText = clipboard.text()
@@ -497,45 +523,39 @@ def clipboardChanged():
 
             print clipboard.text()
         else:
-            clp.OpenClipboard(None)
+           checkForFile()
 
-            rc = clp.EnumClipboardFormats(0)
-            while rc:
-                try:
-                    format_name = clp.GetClipboardFormatName(rc)
-                except win32api.error:
-                    format_name = "?"
-                # print "format", rc, format_name
-                try:
-                    format = clp.GetClipboardData(rc)
-                except win32api.error:
-                    format = "?"
-                if (format_name == '?'):
-                    if (len(format) > 0):
-                        print "File Source Path: \n", format[0]
+def checkForFile():
+    clp.OpenClipboard(None)
 
-                        path = format[0]
+    rc = clp.EnumClipboardFormats(0)
+    while rc:
+        try:
+            format_name = clp.GetClipboardFormatName(rc)
+        except win32api.error:
+            format_name = "?"
+        # print "format", rc, format_name
+        try:
+            format = clp.GetClipboardData(rc)
+        except win32api.error:
+            format = "?"
+        if (format_name == '?'):
+            if (len(format) > 0):
+                print "File Source Path: \n", format[0]
 
-                        if (path[-4:] == '.pdf'):
-                            fp = open(path, 'rb')
-                            parser = PDFParser(fp)
-                            doc = PDFDocument(parser)
+                path = format[0]
 
-                            print doc.info
+                if (path[-4:] == '.pdf'):
+                    fp = open(path, 'rb')
+                    parser = PDFParser(fp)
+                    doc = PDFDocument(parser)
 
-                rc = clp.EnumClipboardFormats(rc)
+                    print doc.info
 
-            clp.CloseClipboard()
+        rc = clp.EnumClipboardFormats(rc)
 
-        # soup = BeautifulSoup(mimeData.html(), "html.parser")
-        #
-        # links = soup.find_all('a')
-        #
-        # # print links
-        # for tag in links:
-        #     link = tag.get('href', None)
-        #     if link is not None:
-        #         print link
+    clp.CloseClipboard()
+
 
 
 def find(name, path):
