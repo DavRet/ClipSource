@@ -34,6 +34,8 @@ import pyapa
 import wmi
 import scandir
 import urllib
+#import textract
+
 
 from crossref.restful import Works
 
@@ -356,6 +358,9 @@ def clipboardChanged():
             source = HTMLClipboard.GetSource()
             print source
 
+            if source != 'about:blank':
+                getMetaDataFromUrl(source)
+
             if "wikipedia" in current_window.lower():
                 putWikiCitationToClipboard(source)
                 return
@@ -429,9 +434,29 @@ def clipboardChanged():
         else:
             checkForFile()
 
+def getMetaDataFromUrl(url):
+    f = urllib.urlopen(url)
+    soup = BeautifulSoup(f, "lxml")
+
+    metadata_items = []
+    for item in soup.findAll("meta"):
+        metadata_items.append(item)
+
 
 def putWikiCitationToClipboard(source):
-    wiki_citation = getWikiCitation(wikipedia_base_url + getLinkForWikiCitation(source))
+    citation_link =  getLinkForWikiCitation(source)
+    wiki_citation = getWikiCitation(wikipedia_base_url +citation_link)
+
+    id = citation_link.split("id=",1)[1]
+
+    name = source.split("/wiki/", 1)[1]
+
+    wiki_page = wikipedia.page(wikipedia.suggest(name))
+
+    references_in_page = wiki_page.references
+
+
+
     clp.OpenClipboard(None)
 
     clp.SetClipboardData(citation_format, unicode(wiki_citation))
@@ -471,6 +496,9 @@ def getPdfMetaData(current_window):
     #page = read_pdf.getPage(0)
     #page_content = page.extractText()
     #print page_content
+
+    #text = textract.process(pdf_path, method='pdfminer')
+    #print text
 
 
 
