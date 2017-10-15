@@ -1,10 +1,16 @@
+import ctypes
+import socket
 import sys
 import urllib2
+
+from time import sleep
 
 import datetime
 from ctypes import byref
 
+import PyPDF2 as PyPDF2
 import exifread
+import psutil as psutil
 import pythoncom
 import rdflib
 import win32con
@@ -29,18 +35,27 @@ import wmi
 import scandir
 import urllib
 
+from crossref.restful import Works
+
+from habanero import Crossref
+from habanero import cn
+
+import timeout_decorator
+
+
+
 import citeproc
 from citeproc import CitationStylesStyle, CitationStylesBibliography
 from citeproc import Citation, CitationItem
 from citeproc import formatter
 from citeproc.source.json import CiteProcJSON
 
-
 from lxml import html
 
 import pdfminer
 from pdfminer.pdfparser import PDFParser
 from pdfminer.pdfdocument import PDFDocument
+import scraperwiki
 
 from libcredit import Credit, HTMLCreditFormatter, TextCreditFormatter
 
@@ -59,7 +74,7 @@ from PyQt4 import QtGui, uic
 import win32clipboard as clp, win32api
 
 import pyHook
-
+import flask
 
 c = wmi.WMI()
 
@@ -107,7 +122,6 @@ metadata_format = clp.RegisterClipboardFormat("METADATA")
 
 
 def main():
-
     clipboard.dataChanged.connect(clipboardChanged)
 
     content_list.setModel(content_model)
@@ -127,72 +141,9 @@ def main():
     window.hash_comment_radio.clicked.connect(hashCommentClicked)
     window.slash_comment_radio.clicked.connect(slashCommentClicked)
 
-    # clp.OpenClipboard()
-    # clp.EmptyClipboard()
-    # clp.SetClipboardData(clp.CF_TEXT, None)
-    # clp.CloseClipboard()
-
-    # while True:
-    #     msg = win32gui.GetMessage(0, 0, 0)
-    #     print str(msg)
-
-
-    # while True:
-    #     rc = win32event.MsgWaitForMultipleObjects(
-    #         (StopEvent, OtherEvent),
-    #         0,  # wait for all = false
-    #         TIMEOUT,  # (or win32event.INFINITE)
-    #         win32event.QS_ALLEVENTS)
-    #     print rc
-    #     # your code here
-    #     pythoncom.PumpWaitingMessages()
-
     sys.exit(app.exec_())
 
-# TIMEOUT = 100 # ms
-#
-# StopEvent = win32event.CreateEvent(None, 0, 0, None)
-# OtherEvent = win32event.CreateEvent(None, 0, 0, None)
-#
-# def _MessagePump():
-#     while 1:
-#
-#         rc = win32event.MsgWaitForMultipleObjects(
-#             (StopEvent, OtherEvent),
-#             0,  # wait for all = false
-#             TIMEOUT,  # (or win32event.INFINITE)
-#             win32event.QS_ALLEVENTS)  # type of input
-#
-#
-#         # You can call a function here if it doesn't take too long.
-#         #   It will get executed *at least* every 200ms -- possibly
-#         #   a lot more, depending on the number of windows messages received.
-#
-#         if rc == win32event.WAIT_OBJECT_0:
-#             # Our first event listed was triggered.
-#             # Someone wants us to exit.
-#             break
-#         elif rc == win32event.WAIT_OBJECT_0 + 1:
-#             print ""
-#         # Our second event "OtherEvent" listed was set.
-#         # This is from some other component -
-#         #   wait on as many events as you need
-#         elif rc == win32event.WAIT_OBJECT_0 + 2:
-#             print rc
-#             # A windows message is waiting - take care of it.
-#             # (Don't ask me why a WAIT_OBJECT_MSG isn't defined < WAIT_OBJECT_0)
-#             # Note: this must be done for COM and other windowsy
-#             #   things to work.
-#             if pythoncom.PumpWaitingMessages():
-#                 break  # wm_quit
-#         elif rc == win32event.WAIT_TIMEOUT:
-#             # Our timeout has elapsed.
-#             # Do some work here (e.g, poll something can you can't thread)
-#             #   or just feel good to be alive.
-#             # Good place to call watchdog(). (Editor's note: See my "thread lifetime" recepie.)
-#             pass
-#         else:
-#             raise RuntimeError("unexpected win32wait return value")
+
 
 def get_app_path(hwnd):
     """Get applicatin path given hwnd."""
@@ -234,8 +185,8 @@ def getLinkForWikiCitation(url):
         else:
             return "no link"
 
-def getWikiCitation(url):
 
+def getWikiCitation(url):
     f = urllib.urlopen(url)
 
     soup = BeautifulSoup(f, "lxml")
@@ -255,19 +206,20 @@ def getWikiCitation(url):
         for i in range(len(all_text)):
 
             if "APA" in all_text[i]:
-
-                apa_style = all_text[i+1] + all_text[i+2] + all_text[i+3] + all_text[i+4] + all_text[i+5] + all_text[i+6]
+                apa_style = all_text[i + 1] + all_text[i + 2] + all_text[i + 3] + all_text[i + 4] + all_text[i + 5] + \
+                            all_text[i + 6]
 
                 citations["APA"] = apa_style.strip('\n')
 
             if "AMA" in all_text[i]:
-                ama_style = all_text[i+2] + all_text[i+3] + all_text[i+4] + all_text[i+5]
+                ama_style = all_text[i + 2] + all_text[i + 3] + all_text[i + 4] + all_text[i + 5]
                 citations["AMA"] = ama_style.strip('\n')
     return citations
 
 
 def formatToAPA(author, created, publisher, retrieved, source):
     print "test"
+
 
 def slashCommentClicked():
     if (window.slash_comment_radio.isChecked()):
@@ -341,13 +293,13 @@ def buttonClick():
 def getGettyImageMetadata(source):
     meta_data = []
     if "media" in source:
-        print "MEDIA"+source
+        print "MEDIA" + source
         first_link_fragment = "http://www.gettyimages.de/detail/foto/"
         name_and_id = source.split("/", 4)[4]
         print name_and_id.split("-picture-", 2)
         name = name_and_id.split("-picture-", 2)[0]
         id = name_and_id.split("-picture-", 2)[1].split("id", 2)[1]
-        url = first_link_fragment + name + "-lizenzfreies-bild/" +  id
+        url = first_link_fragment + name + "-lizenzfreies-bild/" + id
 
         print url
 
@@ -367,6 +319,7 @@ def getGettyImageMetadata(source):
 
     return meta_data
 
+
 def getAllClipboardFormats():
     clp.OpenClipboard(None)
     rc = clp.EnumClipboardFormats(0)
@@ -384,6 +337,7 @@ def getAllClipboardFormats():
         rc = clp.EnumClipboardFormats(rc)
     clp.CloseClipboard()
 
+
 def clipboardChanged():
     print "CLIPBOARD CHANGED"
 
@@ -391,7 +345,6 @@ def clipboardChanged():
 
     app_name = get_app_name(win32gui.GetForegroundWindow())
     mimeData = clipboard.mimeData()
-
 
     if ".pdf" in current_window:
         last_clipboard_content_for_pdf.append(clipboard.text())
@@ -449,7 +402,6 @@ def clipboardChanged():
 
                     clp.CloseClipboard()
 
-
             originalText = clipboard.text()
 
             if originalText == None or originalText == "":
@@ -475,7 +427,8 @@ def clipboardChanged():
 
             print clipboard.text()
         else:
-           checkForFile()
+            checkForFile()
+
 
 def putWikiCitationToClipboard(source):
     wiki_citation = getWikiCitation(wikipedia_base_url + getLinkForWikiCitation(source))
@@ -488,12 +441,38 @@ def putWikiCitationToClipboard(source):
 
     clp.CloseClipboard()
 
+
 def getPdfMetaData(current_window):
     pdf_title = current_window.split(" - ", 1)[0]
-    pdf_path = find(pdf_title, "C:\Users\David\Desktop")
+    pdf_path = ''
+
+    process_id = win32process.GetWindowThreadProcessId(win32gui.GetForegroundWindow())
+
+    p = psutil.Process(process_id[1])
+    files = p.open_files()
+
+    for file in files:
+        if pdf_title in str(file):
+            print file[0]
+            pdf_path = file[0]
+
+    if pdf_path == '':
+        pdf_path = find(pdf_title, "C:\Users\David\Desktop")
+
     fp = open(pdf_path, 'rb')
     parser = PDFParser(fp)
     doc = PDFDocument(parser)
+
+    pdf_file = open(pdf_path, 'rb')
+
+    # Extracting Text from PDF
+    #read_pdf = PyPDF2.PdfFileReader(pdf_file)
+    #number_of_pages = read_pdf.getNumPages()
+    #page = read_pdf.getPage(0)
+    #page_content = page.extractText()
+    #print page_content
+
+
 
     if 'Author' in doc.info[0]:
         author = doc.info[0]['Author']
@@ -521,13 +500,43 @@ def getPdfMetaData(current_window):
 
     data_for_clipboard = {"Title": title, "Author": author, "Date": str(date), "Keywords": keywords}
 
+    getCrossRefMetaData(title)
+
+
+
+def getCrossRefMetaData(title):
+    print title
+
+
+    print "getting crossref"
+
+    cr = Crossref()
+    query = cr.works(query=title, limit=1)
+
+    doi = ''
+
+    for item in query['message']['items']:
+        doi = item['DOI']
+
+    apa_citation = cn.content_negotiation(ids = doi, format = "text", style = "apa")
+    rdf_citation = cn.content_negotiation(ids = doi, format = "rdf-xml")
+
+    json_citation = cn.content_negotiation(ids=doi, format="citeproc-json")
+
+    bib_entry= cn.content_negotiation(ids=doi, format="bibentry")
+
+    print apa_citation
+
     clp.OpenClipboard(None)
 
-    clp.SetClipboardData(metadata_format, unicode(data_for_clipboard))
-    clp.SetClipboardData(src_format, unicode(pdf_path))
+    clp.SetClipboardData(citation_format, unicode(apa_citation))
 
-    print clp.GetClipboardData(metadata_format)
+    print clp.GetClipboardData(citation_format)
+
     clp.CloseClipboard()
+
+
+
 
 def checkForFile():
     clp.OpenClipboard(None)
@@ -559,7 +568,6 @@ def checkForFile():
         rc = clp.EnumClipboardFormats(rc)
 
     clp.CloseClipboard()
-
 
 
 def find(name, path):
