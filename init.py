@@ -460,57 +460,7 @@ def getWikiMediaMetaData(source):
         #print item
     #return metadata_items
 
-def testElogIo():
-    BASEURL = "http://catalog.elog.io"
-
-    parser = argparse.ArgumentParser(description='Get image information from elog.io.')
-    parser.add_argument('https://commons.wikimedia.org/wiki/Category:Clich%C3%A9s#/media/File:Butterfly_flower_cliche.jpg', metavar='URL', type=str,
-                        help='An image URL to query')
-
-    args = parser.parse_args()
-    img_url = args.url
-
-    params = urllib.parse.urlencode({'uri': 'https://commons.wikimedia.org/wiki/Category:Clich%C3%A9s#/media/File:Butterfly_flower_cliche.jpg'})
-    url = BASEURL + "/lookup/uri?%s" % params
-
-    # search for work by URI
-    try:
-        req = urllib.request.Request(url)
-        req.add_header('Accept', 'application/json')
-        res = urllib.request.urlopen(req).read().decode('utf-8')
-    except urllib.urlerror.URLError as err:
-        print('Image lookup error: {0}'.format(err))
-        sys.exit(1)
-
-    results = json.loads(res)
-
-    for r in results:
-        href = r['href']
-
-        print('Found matching work at {0}'.format(href))
-
-        try:
-            req = urllib.request.Request(href)
-            req.add_header('Accept', 'application/json')
-            res = urllib.request.urlopen(req).read().decode('utf-8')
-        except urllib.urlerror.URLError as err:
-            print('Error getting work data: {0}'.format(err))
-            sys.exit(1)
-
-        work = json.loads(res)
-        annotations = work['annotations']
-
-        for a in annotations:
-            p = a['property']
-            name = p['propertyName']
-            value = p['value']
-
-            print("Property: {0}. Value: {1}".format(name, value))
-        print()
-
 def clipboardChanged():
-
-    #testElogIo()
     print "CLIPBOARD CHANGED"
     current_window = win32gui.GetWindowText(win32gui.GetForegroundWindow())
 
