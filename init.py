@@ -1,15 +1,13 @@
+## Imports
 import argparse
 import ctypes
 import socket
 import sys
 import urllib2
 from threading import Thread
-
 from time import sleep
-
 import datetime
 from ctypes import byref
-
 import PyPDF2 as PyPDF2
 import exifread
 import psutil as psutil
@@ -17,18 +15,14 @@ import pythoncom
 import rdflib
 import win32con
 import win32gui
-
 import win32process
-
 import wikipedia
 import bibgen
 import win32event
 import json
-
 import win32ui
 from PyQt4.QtCore import QTimer
 from bs4 import BeautifulSoup
-
 import HTMLClipboard
 import os
 import os.path
@@ -38,52 +32,36 @@ import wmi
 import scandir
 import urllib
 #import textract
-
-
 from crossref.restful import Works
-
 from habanero import Crossref
 from habanero import cn
-
 import timeout_decorator
-
-
-
 import citeproc
 from citeproc import CitationStylesStyle, CitationStylesBibliography
 from citeproc import Citation, CitationItem
 from citeproc import formatter
 from citeproc.source.json import CiteProcJSON
-
 from lxml import html
-
 import pdfminer
 from pdfminer.pdfparser import PDFParser
 from pdfminer.pdfdocument import PDFDocument
 import scraperwiki
-
 from libcredit import Credit, HTMLCreditFormatter, TextCreditFormatter
-
 from PySide import QtGui, QtCore
-
-app = QtGui.QApplication(sys.argv)
-clipboard = app.clipboard()
-
-clips = []
-
-currentIndex = []
-
 import pygubu
 from PyQt4 import QtGui, uic
-
 import win32clipboard as clp, win32api
-
 import pyHook
 from flask import Flask
 
-c = wmi.WMI()
+import webbrowser
+import requests
 
 
+
+
+
+# Application Window (Not used anymore)
 class Application:
     def __init__(self, master):
         # 1: Create a builder
@@ -102,34 +80,42 @@ class Window(QtGui.QMainWindow):
         uic.loadUi('clipui.ui', self)
         #self.show()
 
+# Setup QT for listening to clipboard changes
+app = QtGui.QApplication(sys.argv)
+clipboard = app.clipboard()
 
+clips = []
+currentIndex = []
+c = wmi.WMI()
+
+# UI Variables (not used anymore)
 window = Window()
-
 content_list = window.content_list
 content_model = QtGui.QStandardItemModel(content_list)
-
 source_list = window.source_list
 source_model = QtGui.QStandardItemModel(source_list)
-
 source_radio = window.source_radio
-
 clip_edit = window.clip_edit
-
 auto_source_enabled = False
 
+# Copying in PDFs fires multiple events, so the contents are stored here and then checked if they have changed
 last_clipboard_content_for_pdf = []
 
+# Wiki Base URLs for retrieving metadata
 wikipedia_base_url = "https://en.wikipedia.org"
-
 wikimedia_base_url = 'https://commons.wikimedia.org'
 
+# Register custom clipboard formats
 citation_format = clp.RegisterClipboardFormat("CITATIONS")
 src_format = clp.RegisterClipboardFormat("SOURCE")
 metadata_format = clp.RegisterClipboardFormat("METADATA")
 
+# Setup local flask server
 server = Flask(__name__)
 
-@server.route("/citations.py")  # consider to use more elegant URL in your JS
+
+# Returns current clipboard citations as JSON (https://localhost:5000/citations.py)
+@server.route("/citations.py")
 def get_citations():
     clp.OpenClipboard(None)
 
@@ -168,8 +154,8 @@ def get_citations():
     json_data = json.dumps(data)
     return json_data
 
-
-@server.route("/source.py")  # consider to use more elegant URL in your JS
+# Returns current clipboard source as JSON (https://localhost:5000/source.py)
+@server.route("/source.py")
 def get_source():
     clp.OpenClipboard(None)
 
@@ -211,40 +197,51 @@ def get_source():
     json_data = json.dumps(data)
     return json_data
 
+# Starts local flask server
 def start_server():
     server.run(ssl_context='adhoc')
 
-def main():
-    reload(sys)
+def reverseImageSearch():
+    imageUrl = 'http://cdn.sstatic.net/Sites/stackoverflow/company/img/logos/so/so-icon.png'
+    searchUrl = 'https://www.google.com/searchbyimage?site=search&sa=X&image_url='
 
+    url = searchUrl+imageUrl
+    f = urllib.urlopen(url)
+
+    soup = BeautifulSoup(f, "lxml")
+
+    print soup
+def main():
+
+    #reverseImageSearch()
+    # Generate new thread for local flask server
     server_thread = Thread(target=start_server)
     server_thread.start()
 
-
+    # Fixes false decoding errors
+    reload(sys)
     sys.setdefaultencoding('Cp1252')
 
+    # Connects the clipboard changed event to clipboardChanged function
     clipboard.dataChanged.connect(clipboardChanged)
 
+    # UI Setup (not used anymore)
+    # UI Model Setup
     content_list.setModel(content_model)
     source_list.setModel(source_model)
-
-    source_radio.toggled.connect(sourceRadioClicked)
-
-    #window.show()
-
     setModelForList()
 
+    # UI Click Listeners
+    source_radio.toggled.connect(sourceRadioClicked)
+    #window.show()
     content_list.clicked.connect(contentClick)
     source_list.clicked.connect(sourceClick)
-
     clip_edit.textChanged.connect(editTextChanged)
-
     window.hash_comment_radio.clicked.connect(hashCommentClicked)
     window.slash_comment_radio.clicked.connect(slashCommentClicked)
 
+    # Starts the QT Application loop which listens to clipboard changes
     sys.exit(app.exec_())
-
-
 
 def get_app_path(hwnd):
     """Get applicatin path given hwnd."""
