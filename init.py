@@ -31,7 +31,7 @@ import pyapa
 import wmi
 import scandir
 import urllib
-#import textract
+# import textract
 from crossref.restful import Works
 from habanero import Crossref
 from habanero import cn
@@ -54,11 +54,9 @@ import win32clipboard as clp, win32api
 import pyHook
 from flask import Flask
 
-import webbrowser
-import requests
+import isbnlib
 
-
-
+import re
 
 
 # Application Window (Not used anymore)
@@ -78,7 +76,8 @@ class Window(QtGui.QMainWindow):
     def __init__(self):
         super(Window, self).__init__()
         uic.loadUi('clipui.ui', self)
-        #self.show()
+        # self.show()
+
 
 # Setup QT for listening to clipboard changes
 app = QtGui.QApplication(sys.argv)
@@ -102,6 +101,7 @@ auto_source_enabled = False
 last_clipboard_content_for_pdf = []
 
 # Wiki Base URLs for retrieving metadata
+wikipedia_base_url_german = "https://de.wikipedia.org"
 wikipedia_base_url = "https://en.wikipedia.org"
 wikimedia_base_url = 'https://commons.wikimedia.org'
 
@@ -120,7 +120,7 @@ def get_citations():
     clp.OpenClipboard(None)
 
     try:
-        text = clp.GetClipboardData(clp.CF_TEXT)
+        text = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
     except:
         text = "No Text available"
 
@@ -139,9 +139,7 @@ def get_citations():
             clp.CloseClipboard()
             return format
 
-
         rc = clp.EnumClipboardFormats(rc)
-
 
     clp.CloseClipboard()
     data = {}
@@ -150,9 +148,9 @@ def get_citations():
     data['AMA'] = "no citations in clipboard"
     data['content'] = text
 
-
     json_data = json.dumps(data)
     return json_data
+
 
 # Returns current clipboard source as JSON (https://localhost:5000/source.py)
 @server.route("/source.py")
@@ -160,7 +158,7 @@ def get_source():
     clp.OpenClipboard(None)
 
     try:
-        text = clp.GetClipboardData(clp.CF_TEXT)
+        text = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
     except:
         text = "No Text available"
 
@@ -189,31 +187,40 @@ def get_source():
 
     data = {}
 
-
     data['source'] = "no source in clipboard"
     data['content'] = text
 
-
     json_data = json.dumps(data)
     return json_data
+
 
 # Starts local flask server
 def start_server():
     server.run(ssl_context='adhoc')
 
+
 def reverseImageSearch():
     imageUrl = 'http://cdn.sstatic.net/Sites/stackoverflow/company/img/logos/so/so-icon.png'
     searchUrl = 'https://www.google.com/searchbyimage?site=search&sa=X&image_url='
 
-    url = searchUrl+imageUrl
+    url = searchUrl + imageUrl
     f = urllib.urlopen(url)
 
     soup = BeautifulSoup(f, "lxml")
 
     print soup
-def main():
 
-    #reverseImageSearch()
+
+def testEbookExtraction():
+    isbn = isbnlib.isbn_from_words("game of thrones")
+    # isbn = '3493589182'
+
+    print isbnlib.meta(isbn, service='default', cache='default')
+
+
+def main():
+    # testEbookExtraction()
+    # reverseImageSearch()
     # Generate new thread for local flask server
     server_thread = Thread(target=start_server)
     server_thread.start()
@@ -233,7 +240,7 @@ def main():
 
     # UI Click Listeners
     source_radio.toggled.connect(sourceRadioClicked)
-    #window.show()
+    # window.show()
     content_list.clicked.connect(contentClick)
     source_list.clicked.connect(sourceClick)
     clip_edit.textChanged.connect(editTextChanged)
@@ -242,6 +249,7 @@ def main():
 
     # Starts the QT Application loop which listens to clipboard changes
     sys.exit(app.exec_())
+
 
 def get_app_path(hwnd):
     """Get applicatin path given hwnd."""
@@ -390,6 +398,8 @@ def buttonClick():
 
 def getGettyImageMetadata(source):
     meta_data = []
+    meta_data_dict = {}
+
     if "media" in source:
         print "MEDIA" + source
         first_link_fragment = "http://www.gettyimages.de/detail/foto/"
@@ -405,17 +415,41 @@ def getGettyImageMetadata(source):
         soup = BeautifulSoup(f, "lxml")
 
         description = soup.find("meta", itemprop="description")
+        author = soup.find("meta", itemprop="author")
+        copyright = soup.find("meta", itemprop="copyrightHolder")
+        name = soup.find("meta", itemprop="name")
 
-        for meta_data_item in soup.findAll("meta"):
-            meta_data.append(meta_data_item)
+        meta_data_dict['author'] = author['content']
+        meta_data_dict['description'] = description['content']
+        meta_data_dict['copyright'] = copyright['content']
+        meta_data_dict['name'] = name['content']
+
+
+
+
+
+
+
+        # for meta_data_item in soup.findAll("meta"):
+        #     meta_data.append(meta_data_item)
     else:
         f = urllib.urlopen(source)
         soup = BeautifulSoup(f, "lxml")
 
+        description = soup.find("meta", itemprop="description")
+        author = soup.find("meta", itemprop="author")
+        copyright = soup.find("meta", itemprop="copyrightHolder")
+        name = soup.find("meta", itemprop="name")
+
+        meta_data_dict['author'] = author['content']
+        meta_data_dict['description'] = description['content']
+        meta_data_dict['copyright'] = copyright['content']
+        meta_data_dict['name'] = name['content']
+
         for meta_data_item in soup.findAll("meta"):
             meta_data.append(meta_data_item)
 
-    return meta_data
+    return meta_data_dict
 
 
 def getAllClipboardFormats():
@@ -448,14 +482,15 @@ def getWikiMediaMetaData(source):
     citation_url = wikimedia_base_url + getLinkForWikiCitation(url_to_metadata)
     return getWikiCitation(citation_url)
 
-    #f = urllib.urlopen(url_to_metadata)
-    #soup = BeautifulSoup(f, "lxml")
+    # f = urllib.urlopen(url_to_metadata)
+    # soup = BeautifulSoup(f, "lxml")
 
-    #metadata_items = []
-    #for item in soup.findAll(id="stockphoto_dialog"):
-        #metadata_items.append(item)
-        #print item
-    #return metadata_items
+    # metadata_items = []
+    # for item in soup.findAll(id="stockphoto_dialog"):
+    # metadata_items.append(item)
+    # print item
+    # return metadata_items
+
 
 def clipboardChanged():
     print "CLIPBOARD CHANGED"
@@ -463,6 +498,25 @@ def clipboardChanged():
 
     app_name = get_app_name(win32gui.GetForegroundWindow())
     mimeData = clipboard.mimeData()
+
+    # clp.OpenClipboard()
+    # rc = clp.EnumClipboardFormats(0)
+    # while rc:
+    #     try:
+    #         format_name = clp.GetClipboardFormatName(rc)
+    #     except win32api.error:
+    #         format_name = "?"
+    #     # print "format", rc, format_name
+    #     try:
+    #         format = clp.GetClipboardData(rc)
+    #     except win32api.error:
+    #         format = "?"
+    #     print format_name
+    #     print format
+    #
+    #     rc = clp.EnumClipboardFormats(rc)
+    #
+    # clp.CloseClipboard()
 
     if app_name == 'WINWORD.EXE':
         return
@@ -477,12 +531,19 @@ def clipboardChanged():
             source = HTMLClipboard.GetSource()
             print source
 
-            if source != 'about:blank' and source != None:
-                getMetaDataFromUrl(source)
+            if(source != None):
+                if source != 'about:blank':
+                    getMetaDataFromUrl(source)
 
-            if "wikipedia" in current_window.lower():
-                putWikiCitationToClipboard(source)
-                return
+                if wikipedia_base_url in source:
+                    print "is english wiki"
+                    putWikiCitationToClipboard(source)
+                    return
+
+                if wikipedia_base_url_german in source:
+                    print "is german wiki"
+                    putGermanWikiCitationToClipboard(source)
+                    return
 
             if (source == None):
                 html = ""
@@ -518,7 +579,7 @@ def clipboardChanged():
 
                     meta = {}
 
-                    sources['content'] = "image"
+                    sources['content'] = "image with citation"
                     sources['source'] = source
 
                     meta['citations'] = meta_data['APA']
@@ -531,6 +592,7 @@ def clipboardChanged():
 
                     return
                 if "getty" in current_window.lower():
+
                     meta_data = getGettyImageMetadata(source)
 
                     clp.OpenClipboard(None)
@@ -539,38 +601,58 @@ def clipboardChanged():
 
                     meta = {}
 
-                    sources['content'] = "image"
+                    sources['content'] = "image with metadata"
                     sources['source'] = source
-
 
                     meta['citations'] = meta_data
 
                     print meta_data
                     clp.SetClipboardData(src_format, json.dumps(sources))
-                    #clp.SetClipboardData(citation_format, json.dumps(meta))
+                    clp.SetClipboardData(citation_format, json.dumps(meta))
 
-                    #print clp.GetClipboardData(citation_format)
+                    print clp.GetClipboardData(citation_format)
 
                     clp.CloseClipboard()
                     return
                 else:
-                    clp.OpenClipboard(None)
-                    sources = {}
 
-                    sources['content'] = "image"
-                    sources['source'] = source
+                    try:
+                        clp.OpenClipboard(None)
+                        src = clp.GetClipboardData(src_format)
+                        if "image" in src:
 
+                            print "is in it"
+                            return
+                        else:
+                            sources = {}
 
-                    clp.SetClipboardData(src_format, json.dumps(sources))
-                    print clp.GetClipboardData(src_format)
+                            sources['content'] = "image"
+                            sources['source'] = source
 
-                    clp.CloseClipboard()
-                    return
+                            clp.OpenClipboard(None)
+                            clp.SetClipboardData(src_format, json.dumps(sources))
+                            print clp.GetClipboardData(src_format)
+
+                            clp.CloseClipboard()
+                            return
+                    except:
+                        sources = {}
+
+                        sources['content'] = "image"
+                        sources['source'] = source
+
+                        clp.OpenClipboard(None)
+                        clp.SetClipboardData(src_format, json.dumps(sources))
+                        print clp.GetClipboardData(src_format)
+
+                        clp.CloseClipboard()
+                        return
+
 
             clp.OpenClipboard(None)
             sources = {}
             sources['source'] = source
-            sources['content'] = clp.GetClipboardData(clp.CF_TEXT).encode('utf-8')
+            sources['content'] = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
 
             clp.SetClipboardData(src_format, json.dumps(sources))
 
@@ -603,6 +685,7 @@ def clipboardChanged():
         else:
             checkForFile()
 
+
 def getMetaDataFromUrl(url):
     f = urllib.urlopen(url)
     soup = BeautifulSoup(f, "lxml")
@@ -612,17 +695,55 @@ def getMetaDataFromUrl(url):
         metadata_items.append(item)
 
 
-def putWikiCitationToClipboard(source):
-    citation_link =  getLinkForWikiCitation(source)
-    wiki_citation = getWikiCitation(wikipedia_base_url +citation_link)
+def getGermanWikiCitation(url):
+    f = urllib.urlopen(url)
 
-    id = citation_link.split("id=",1)[1]
+    soup = BeautifulSoup(f, "lxml")
+
+    first_paragraph = soup.find("p")
+    citation = ''
+    for item in first_paragraph.findAll(text=True):
+        citation = citation + item
+
+    return citation
+
+
+def putGermanWikiCitationToClipboard(source):
+    citation_link = getLinkForWikiCitation(source)
+    wiki_citation = getGermanWikiCitation(wikipedia_base_url_german + citation_link)
+
+    clp.OpenClipboard(None)
+
+    citations = {}
+
+    citations['APA'] = wiki_citation
+    citations['content'] = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
+
+    clp.SetClipboardData(citation_format, json.dumps(citations))
+
+    sources = {}
+
+    sources['source'] = source
+    sources['content'] = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
+
+    clp.SetClipboardData(src_format, json.dumps(sources))
+
+    print clp.GetClipboardData(citation_format)
+
+    clp.CloseClipboard()
+
+
+def putWikiCitationToClipboard(source):
+    citation_link = getLinkForWikiCitation(source)
+    wiki_citation = getWikiCitation(wikipedia_base_url + citation_link)
+
+    id = citation_link.split("id=", 1)[1]
 
     name = source.split("/wiki/", 1)[1]
 
-    #wiki_page = wikipedia.page(wikipedia.suggest(name))
+    # wiki_page = wikipedia.page(wikipedia.suggest(name))
 
-    #references_in_page = wiki_page.references
+    # references_in_page = wiki_page.references
     print wiki_citation
     clp.OpenClipboard(None)
 
@@ -630,15 +751,14 @@ def putWikiCitationToClipboard(source):
 
     citations['AMA'] = wiki_citation['AMA']
     citations['APA'] = wiki_citation['APA']
-    citations['content'] = clp.GetClipboardData(clp.CF_TEXT)
+    citations['content'] = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
 
     clp.SetClipboardData(citation_format, json.dumps(citations))
 
     sources = {}
 
     sources['source'] = source
-    sources['content'] = clp.GetClipboardData(clp.CF_TEXT)
-
+    sources['content'] = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
 
     clp.SetClipboardData(src_format, json.dumps(sources))
 
@@ -671,14 +791,14 @@ def getPdfMetaData(current_window):
     pdf_file = open(pdf_path, 'rb')
 
     # Extracting Text from PDF
-    #read_pdf = PyPDF2.PdfFileReader(pdf_file)
-    #number_of_pages = read_pdf.getNumPages()
-    #page = read_pdf.getPage(0)
-    #page_content = page.extractText()
-    #print page_content
+    # read_pdf = PyPDF2.PdfFileReader(pdf_file)
+    # number_of_pages = read_pdf.getNumPages()
+    # page = read_pdf.getPage(0)
+    # page_content = page.extractText()
+    # print page_content
 
-    #text = textract.process(pdf_path, method='pdfminer')
-    #print text
+    # text = textract.process(pdf_path, method='pdfminer')
+    # print text
 
 
 
@@ -711,10 +831,11 @@ def getPdfMetaData(current_window):
     getCrossRefMetaData(title, pdf_path)
 
 
+def prettifyUTF8Strings(string):
+    return re.sub(ur'[\xc2-\xf4][\x80-\xbf]+', lambda m: m.group(0).encode('latin1').decode('utf8'), string)
 
 def getCrossRefMetaData(title, path):
     print title
-
 
     print "getting crossref"
 
@@ -726,28 +847,36 @@ def getCrossRefMetaData(title, path):
     for item in query['message']['items']:
         doi = item['DOI']
 
-    apa_citation = cn.content_negotiation(ids = doi, format = "text", style = "apa")
-    rdf_citation = cn.content_negotiation(ids = doi, format = "rdf-xml")
+    print isbnlib.doi2tex(doi)
+
+    apa_citation = cn.content_negotiation(ids=doi, format="text", style="apa")
+    rdf_citation = cn.content_negotiation(ids=doi, format="rdf-xml")
 
     json_citation = cn.content_negotiation(ids=doi, format="citeproc-json")
 
-    bib_entry= cn.content_negotiation(ids=doi, format="bibentry")
+    bib_entry = cn.content_negotiation(ids=doi, format="bibentry")
 
-    print apa_citation
+    apa_citation = prettifyUTF8Strings(apa_citation).strip('\n')
 
     clp.OpenClipboard(None)
 
     citations = {}
 
     citations['APA'] = apa_citation
-    citations['content'] = clp.GetClipboardData(clp.CF_TEXT)
+    try:
+        citations['content'] = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
+    except:
+        citations['content'] = 'no text content available'
 
     clp.SetClipboardData(citation_format, json.dumps(citations))
 
     sources = {}
 
     sources['source'] = path
-    sources['content'] = clp.GetClipboardData(clp.CF_TEXT)
+    try:
+        sources['content'] = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
+    except:
+        sources['content'] = 'no text content available'
 
     clp.SetClipboardData(src_format, json.dumps(sources))
 
@@ -756,38 +885,44 @@ def getCrossRefMetaData(title, path):
     clp.CloseClipboard()
 
 
-
-
 def checkForFile():
-    clp.OpenClipboard(None)
+    try:
+        clp.OpenClipboard()
 
-    rc = clp.EnumClipboardFormats(0)
-    while rc:
-        try:
-            format_name = clp.GetClipboardFormatName(rc)
-        except win32api.error:
-            format_name = "?"
-        # print "format", rc, format_name
-        try:
-            format = clp.GetClipboardData(rc)
-        except win32api.error:
-            format = "?"
-        if (format_name == '?'):
-            if (len(format) > 0):
-                print "File Source Path: \n", format[0]
+        rc = clp.EnumClipboardFormats(0)
+        while rc:
+            try:
+                format_name = clp.GetClipboardFormatName(rc)
+            except win32api.error:
+                format_name = "?"
+            try:
+                format = clp.GetClipboardData(rc)
+            except win32api.error:
+                format = "?"
+            if (format_name == '?'):
+                if (len(format) > 0):
+                    print "File Source Path: \n", format[0]
 
-                path = format[0]
+                    path = format[0]
 
-                if (path[-4:] == '.pdf'):
-                    fp = open(path, 'rb')
-                    parser = PDFParser(fp)
-                    doc = PDFDocument(parser)
+                    if (path[-4:] == '.pdf'):
+                        fp = open(path, 'rb')
+                        parser = PDFParser(fp)
+                        doc = PDFDocument(parser)
 
-                    print doc.info
+                        if 'Title' in doc.info[0]:
+                            title = doc.info[0]['Title']
+                        else:
+                            title = "No Title found"
 
-        rc = clp.EnumClipboardFormats(rc)
+                        getCrossRefMetaData(title, path)
 
-    clp.CloseClipboard()
+            rc = clp.EnumClipboardFormats(rc)
+
+        clp.CloseClipboard()
+
+    except:
+        print "error"
 
 
 def find(name, path):
