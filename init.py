@@ -117,81 +117,111 @@ server = Flask(__name__)
 # Returns current clipboard citations as JSON (https://localhost:5000/citations.py)
 @server.route("/citations.py")
 def get_citations():
-    clp.OpenClipboard(None)
-
     try:
-        text = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
+        clp.OpenClipboard(None)
+
+        try:
+            text = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
+        except:
+            text = "No Text available"
+
+        rc = clp.EnumClipboardFormats(0)
+        while rc:
+            try:
+                format_name = clp.GetClipboardFormatName(rc)
+            except win32api.error:
+                format_name = "?"
+            # print "format", rc, format_name
+            try:
+                format = clp.GetClipboardData(rc)
+            except win32api.error:
+                format = "?"
+            if format_name == "CITATIONS":
+                clp.CloseClipboard()
+                return format
+
+            rc = clp.EnumClipboardFormats(rc)
+
+        clp.CloseClipboard()
+        data = {}
+
+        data['APA'] = "no citations in clipboard"
+        data['AMA'] = "no citations in clipboard"
+        data['content'] = text
+
+        json_data = json.dumps(data)
+        return json_data
     except:
-        text = "No Text available"
-
-    rc = clp.EnumClipboardFormats(0)
-    while rc:
         try:
-            format_name = clp.GetClipboardFormatName(rc)
-        except win32api.error:
-            format_name = "?"
-        # print "format", rc, format_name
-        try:
-            format = clp.GetClipboardData(rc)
-        except win32api.error:
-            format = "?"
-        if format_name == "CITATIONS":
             clp.CloseClipboard()
-            return format
+        except:
+            print "clipboard already closed"
 
-        rc = clp.EnumClipboardFormats(rc)
+        data = {}
 
-    clp.CloseClipboard()
-    data = {}
+        data['APA'] = "no citations in clipboard"
+        data['AMA'] = "no citations in clipboard"
+        data['content'] = "no text in clipboard"
 
-    data['APA'] = "no citations in clipboard"
-    data['AMA'] = "no citations in clipboard"
-    data['content'] = text
+        json_data = json.dumps(data)
+        return json_data
 
-    json_data = json.dumps(data)
-    return json_data
 
 
 # Returns current clipboard source as JSON (https://localhost:5000/source.py)
 @server.route("/source.py")
 def get_source():
-    clp.OpenClipboard(None)
-
     try:
-        text = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
+        clp.OpenClipboard(None)
+
+        try:
+            text = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
+        except:
+            text = "No Text available"
+
+        formats = {}
+
+        rc = clp.EnumClipboardFormats(0)
+        while rc:
+            try:
+                format_name = clp.GetClipboardFormatName(rc)
+            except win32api.error:
+                format_name = "?"
+            # print "format", rc, format_name
+            try:
+                format = clp.GetClipboardData(rc)
+            except win32api.error:
+                format = "?"
+            if format_name == "SOURCE":
+                clp.CloseClipboard()
+                return format
+
+            formats[format_name] = format
+
+            rc = clp.EnumClipboardFormats(rc)
+
+        clp.CloseClipboard()
+
+        data = {}
+
+        data['source'] = "no source in clipboard"
+        data['content'] = text
+
+        json_data = json.dumps(data)
+        return json_data
     except:
-        text = "No Text available"
-
-    formats = {}
-
-    rc = clp.EnumClipboardFormats(0)
-    while rc:
         try:
-            format_name = clp.GetClipboardFormatName(rc)
-        except win32api.error:
-            format_name = "?"
-        # print "format", rc, format_name
-        try:
-            format = clp.GetClipboardData(rc)
-        except win32api.error:
-            format = "?"
-        if format_name == "SOURCE":
             clp.CloseClipboard()
-            return format
+        except:
+            print "clipboard already closed"
 
-        formats[format_name] = format
+        data = {}
 
-        rc = clp.EnumClipboardFormats(rc)
+        data['source'] = "no source in clipboard"
+        data['content'] = "no text in clipboard"
 
-    clp.CloseClipboard()
-
-    data = {}
-
-    data['source'] = "no source in clipboard"
-    data['content'] = text
-
-    json_data = json.dumps(data)
-    return json_data
+        json_data = json.dumps(data)
+        return json_data
 
 
 # Starts local flask server
@@ -218,19 +248,26 @@ def testEbookExtraction():
     print isbnlib.meta(isbn, service='default', cache='default')
 
 
+def start_clipboard_watcher():
+    clipboard_thread = Thread(target=clipboardChanged)
+    clipboard_thread.start()
+
+
 def main():
     # testEbookExtraction()
     # reverseImageSearch()
     # Generate new thread for local flask server
-    server_thread = Thread(target=start_server)
-    server_thread.start()
+    #server_thread = Thread(target=start_server)
+    #server_thread.start()
+
+    # Connects the clipboard changed event to clipboardChanged function
+    clipboard.dataChanged.connect(clipboardChanged)
 
     # Fixes false decoding errors
     reload(sys)
     sys.setdefaultencoding('Cp1252')
 
-    # Connects the clipboard changed event to clipboardChanged function
-    clipboard.dataChanged.connect(clipboardChanged)
+
 
     # UI Setup (not used anymore)
     # UI Model Setup
@@ -493,197 +530,218 @@ def getWikiMediaMetaData(source):
 
 
 def clipboardChanged():
-    print "CLIPBOARD CHANGED"
-    current_window = win32gui.GetWindowText(win32gui.GetForegroundWindow())
+    try:
+        print "CLIPBOARD CHANGED"
+        current_window = win32gui.GetWindowText(win32gui.GetForegroundWindow())
 
-    app_name = get_app_name(win32gui.GetForegroundWindow())
-    mimeData = clipboard.mimeData()
+        app_name = get_app_name(win32gui.GetForegroundWindow())
+        mimeData = clipboard.mimeData()
 
-    # clp.OpenClipboard()
-    # rc = clp.EnumClipboardFormats(0)
-    # while rc:
-    #     try:
-    #         format_name = clp.GetClipboardFormatName(rc)
-    #     except win32api.error:
-    #         format_name = "?"
-    #     # print "format", rc, format_name
-    #     try:
-    #         format = clp.GetClipboardData(rc)
-    #     except win32api.error:
-    #         format = "?"
-    #     print format_name
-    #     print format
-    #
-    #     rc = clp.EnumClipboardFormats(rc)
-    #
-    # clp.CloseClipboard()
-
-    if app_name == 'WINWORD.EXE':
-        return
-
-    if ".pdf" in current_window:
-        last_clipboard_content_for_pdf.append(clipboard.text())
-        if (len(last_clipboard_content_for_pdf) % 5 == 0):
-            getPdfMetaData(current_window)
+        if app_name == 'WINWORD.EXE':
             return
-    else:
-        if HTMLClipboard.HasHtml():
-            source = HTMLClipboard.GetSource()
-            print source
 
-            if(source != None):
-                if source != 'about:blank':
-                    getMetaDataFromUrl(source)
+        if ".pdf" in current_window:
+            last_clipboard_content_for_pdf.append(clipboard.text())
+            if (len(last_clipboard_content_for_pdf) % 5 == 0):
+                getPdfMetaData(current_window)
+                return
+        else:
+            if HTMLClipboard.HasHtml():
+                source = HTMLClipboard.GetSource()
+                print source
 
-                if wikipedia_base_url in source:
-                    print "is english wiki"
-                    putWikiCitationToClipboard(source)
-                    return
+                if(source != None):
+                    if source != 'about:blank':
+                        getMetaDataFromUrl(source)
 
-                if wikipedia_base_url_german in source:
-                    print "is german wiki"
-                    putGermanWikiCitationToClipboard(source)
-                    return
+                    if wikipedia_base_url in source:
+                        print "is english wiki"
+                        putWikiCitationToClipboard(source)
+                        return
 
-            if (source == None):
-                html = ""
-                clp.OpenClipboard(None)
-                rc = clp.EnumClipboardFormats(0)
-                while rc:
+                    if wikipedia_base_url_german in source:
+                        print "is german wiki"
+                        putGermanWikiCitationToClipboard(source)
+                        return
+
+                if (source == None):
                     try:
-                        format_name = clp.GetClipboardFormatName(rc)
-                    except win32api.error:
-                        format_name = "?"
-                    try:
-                        format = clp.GetClipboardData(rc)
-                    except win32api.error:
-                        format = "?"
-                    if (format_name == "HTML Format"):
-                        html = format
-                    rc = clp.EnumClipboardFormats(rc)
+                        print "is image"
+                        try:
+                            html = ""
+                            clp.OpenClipboard(None)
+                            rc = clp.EnumClipboardFormats(0)
+                            while rc:
+                                try:
+                                    format_name = clp.GetClipboardFormatName(rc)
+                                except win32api.error:
+                                    format_name = "?"
+                                try:
+                                    format = clp.GetClipboardData(rc)
+                                except win32api.error:
+                                    format = "?"
+                                if (format_name == "HTML Format"):
+                                    html = format
+                                    break
+                                rc = clp.EnumClipboardFormats(rc)
 
-                clp.CloseClipboard()
-                soup = BeautifulSoup(html, "html.parser")
+                            clp.CloseClipboard()
 
-                link = soup.find('img')['src']
-                print link
-                source = link
+                            soup = BeautifulSoup(html, "html.parser")
 
-                if "wikimedia" in current_window.lower():
-                    print "is wikimedia"
-                    meta_data = getWikiMediaMetaData(source)
-
-                    clp.OpenClipboard(None)
-
-                    sources = {}
-
-                    meta = {}
-
-                    sources['content'] = "image with citation"
-                    sources['source'] = source
-
-                    meta['citations'] = meta_data['APA']
-
-                    print meta_data
-                    clp.SetClipboardData(src_format, json.dumps(sources))
-                    clp.SetClipboardData(citation_format, json.dumps(meta))
-
-                    clp.CloseClipboard()
-
-                    return
-                if "getty" in current_window.lower():
-
-                    meta_data = getGettyImageMetadata(source)
-
-                    clp.OpenClipboard(None)
-
-                    sources = {}
-
-                    meta = {}
-
-                    sources['content'] = "image with metadata"
-                    sources['source'] = source
-
-                    meta['citations'] = meta_data
-
-                    print meta_data
-                    clp.SetClipboardData(src_format, json.dumps(sources))
-                    clp.SetClipboardData(citation_format, json.dumps(meta))
-
-                    print clp.GetClipboardData(citation_format)
-
-                    clp.CloseClipboard()
-                    return
-                else:
-
-                    try:
-                        clp.OpenClipboard(None)
-                        src = clp.GetClipboardData(src_format)
-                        if "image" in src:
-
-                            print "is in it"
+                            link = soup.find('img')['src']
+                            print link
+                            source = link
+                        except:
+                            print "could not find source"
                             return
-                        else:
-                            sources = {}
 
-                            sources['content'] = "image"
-                            sources['source'] = source
+                        if "wikimedia" in current_window.lower():
+                            print "is wikimedia"
+                            meta_data = getWikiMediaMetaData(source)
 
                             clp.OpenClipboard(None)
+
+                            sources = {}
+
+                            meta = {}
+
+                            sources['content'] = "image with citation"
+                            sources['source'] = source
+
+                            meta['citations'] = meta_data['APA']
+
+                            print meta_data
                             clp.SetClipboardData(src_format, json.dumps(sources))
-                            print clp.GetClipboardData(src_format)
+                            clp.SetClipboardData(citation_format, json.dumps(meta))
+
+                            clp.CloseClipboard()
+
+                            return
+                        if "getty" in current_window.lower():
+
+                            meta_data = getGettyImageMetadata(source)
+
+                            clp.OpenClipboard(None)
+
+                            sources = {}
+
+                            meta = {}
+
+                            sources['content'] = "image with metadata"
+                            sources['source'] = source
+
+                            meta['citations'] = meta_data
+
+                            print meta_data
+                            clp.SetClipboardData(src_format, json.dumps(sources))
+                            clp.SetClipboardData(citation_format, json.dumps(meta))
+
+                            print clp.GetClipboardData(citation_format)
 
                             clp.CloseClipboard()
                             return
+                        else:
+
+                            print "is normal image"
+                            #
+                            # # try:
+                            # #     thisSrc = clp.GetClipboardData(src_format)
+                            # #     clp.CloseClipboard()
+                            # #
+                            # #
+                            # # except:
+                            # #     print "exception here"
+                            # #     clp.CloseClipboard()
+                            #
+                            try:
+                                clp.OpenClipboard(None)
+
+                                try:
+                                    src = clp.GetClipboardData(src_format)
+                                except:
+                                    src = 'none'
+
+
+                                print "SOURCE ", src
+                                if "image" in src:
+                                    clp.CloseClipboard()
+
+                                    print "is in it"
+                                    return
+                                else:
+                                    sources = {}
+
+                                    sources['content'] = "image"
+                                    sources['source'] = source
+
+                                    clp.OpenClipboard(None)
+                                    clp.SetClipboardData(src_format, json.dumps(sources))
+                                    print clp.GetClipboardData(src_format)
+
+                                    clp.CloseClipboard()
+                                    print "end of else"
+                                    return
+                            except:
+                                sources = {}
+
+                                sources['content'] = "image"
+                                sources['source'] = source
+
+                                clp.OpenClipboard(None)
+                                clp.SetClipboardData(src_format, json.dumps(sources))
+                                print clp.GetClipboardData(src_format)
+
+                                clp.CloseClipboard()
+
+                                print "end of except"
+                                return
                     except:
-                        sources = {}
-
-                        sources['content'] = "image"
-                        sources['source'] = source
-
-                        clp.OpenClipboard(None)
-                        clp.SetClipboardData(src_format, json.dumps(sources))
-                        print clp.GetClipboardData(src_format)
-
-                        clp.CloseClipboard()
-                        return
+                        print "image exception"
 
 
-            clp.OpenClipboard(None)
-            sources = {}
-            sources['source'] = source
-            sources['content'] = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
 
-            clp.SetClipboardData(src_format, json.dumps(sources))
+                clp.OpenClipboard(None)
+                sources = {}
+                sources['source'] = source
+                sources['content'] = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
 
+                clp.SetClipboardData(src_format, json.dumps(sources))
+
+                clp.CloseClipboard()
+
+                originalText = clipboard.text()
+
+                if originalText == None or originalText == "":
+                    originalText = "Image"
+
+                # clips.append(tuple((originalText, source)))
+                #
+                # setModelForList()
+                #
+                # if (source_radio.isChecked()):
+                #     wrap_with_comment = "none"
+                #     if window.hash_comment_radio.isChecked():
+                #         wrap_with_comment = "hash"
+                #     elif window.slash_comment_radio.isChecked():
+                #         wrap_with_comment = "slash"
+                #
+                #     if (wrap_with_comment == "hash"):
+                #         clipboard.setText(originalText + "\n" + "# Copied from:\n" + "# " + source)
+                #     elif (wrap_with_comment == "slash"):
+                #         clipboard.setText(originalText + "\n" + "// Copied from:\n" + "// " + source)
+                #     else:
+                #         clipboard.setText(originalText + "\n" + "Copied from:\n" + source)
+                #
+                # print clipboard.text()
+            else:
+                checkForFile()
+    except:
+        try:
             clp.CloseClipboard()
-
-            originalText = clipboard.text()
-
-            if originalText == None or originalText == "":
-                originalText = "Image"
-
-            clips.append(tuple((originalText, source)))
-
-            setModelForList()
-
-            if (source_radio.isChecked()):
-                wrap_with_comment = "none"
-                if window.hash_comment_radio.isChecked():
-                    wrap_with_comment = "hash"
-                elif window.slash_comment_radio.isChecked():
-                    wrap_with_comment = "slash"
-
-                if (wrap_with_comment == "hash"):
-                    clipboard.setText(originalText + "\n" + "# Copied from:\n" + "# " + source)
-                elif (wrap_with_comment == "slash"):
-                    clipboard.setText(originalText + "\n" + "// Copied from:\n" + "// " + source)
-                else:
-                    clipboard.setText(originalText + "\n" + "Copied from:\n" + source)
-
-            print clipboard.text()
-        else:
-            checkForFile()
+        except:
+            print "Clipboard was not open"
+        print "exception"
 
 
 def getMetaDataFromUrl(url):
