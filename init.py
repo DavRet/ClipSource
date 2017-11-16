@@ -58,6 +58,10 @@ import isbnlib
 
 import re
 
+import base64
+
+import requests
+
 
 # Application Window (Not used anymore)
 class Application:
@@ -528,6 +532,8 @@ def getWikiMediaMetaData(source):
     # print item
     # return metadata_items
 
+def getAsBase64(url):
+    return base64.b64encode(requests.get(url).content)
 
 def clipboardChanged():
     try:
@@ -592,6 +598,8 @@ def clipboardChanged():
                             link = soup.find('img')['src']
                             print link
                             source = link
+
+
                         except:
                             print "could not find source"
                             return
@@ -645,6 +653,14 @@ def clipboardChanged():
 
                             print "is normal image"
                             #
+                            # try:
+                            #     base64image = getAsBase64(source)
+                            # except:
+                            #     print "could not find base64"
+                            #     base64image = 'no base64'
+                            #
+                            # print base64image
+                            #
                             # # try:
                             # #     thisSrc = clp.GetClipboardData(src_format)
                             # #     clp.CloseClipboard()
@@ -666,8 +682,6 @@ def clipboardChanged():
                                 print "SOURCE ", src
                                 if "image" in src:
                                     clp.CloseClipboard()
-
-                                    print "is in it"
                                     return
                                 else:
                                     sources = {}
@@ -680,7 +694,6 @@ def clipboardChanged():
                                     print clp.GetClipboardData(src_format)
 
                                     clp.CloseClipboard()
-                                    print "end of else"
                                     return
                             except:
                                 sources = {}
@@ -694,7 +707,6 @@ def clipboardChanged():
 
                                 clp.CloseClipboard()
 
-                                print "end of except"
                                 return
                     except:
                         print "image exception"
@@ -905,14 +917,14 @@ def getCrossRefMetaData(title, path):
     for item in query['message']['items']:
         doi = item['DOI']
 
-    print isbnlib.doi2tex(doi)
+    #print isbnlib.doi2tex(doi)
 
     apa_citation = cn.content_negotiation(ids=doi, format="text", style="apa")
-    rdf_citation = cn.content_negotiation(ids=doi, format="rdf-xml")
+    #rdf_citation = cn.content_negotiation(ids=doi, format="rdf-xml")
 
-    json_citation = cn.content_negotiation(ids=doi, format="citeproc-json")
+    #json_citation = cn.content_negotiation(ids=doi, format="citeproc-json")
 
-    bib_entry = cn.content_negotiation(ids=doi, format="bibentry")
+    #bib_entry = cn.content_negotiation(ids=doi, format="bibentry")
 
     apa_citation = prettifyUTF8Strings(apa_citation).strip('\n')
 
