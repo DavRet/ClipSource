@@ -1,4 +1,4 @@
-## Imports
+# Imports
 import datetime
 import psutil as psutil
 import win32gui
