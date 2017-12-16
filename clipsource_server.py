@@ -20,32 +20,20 @@ def get_citations():
         except:
             text = "No Text available"
 
-        rc = clp.EnumClipboardFormats(0)
-        while rc:
-            try:
-                format_name = clp.GetClipboardFormatName(rc)
-            except win32api.error:
-                format_name = "?"
-            # print "format", rc, format_name
-            try:
-                format = clp.GetClipboardData(rc)
-            except win32api.error:
-                format = "?"
-            if format_name == "CITATIONS":
-                clp.CloseClipboard()
-                return format
+        citation_format = clp.RegisterClipboardFormat("CITATIONS")
+        if clp.IsClipboardFormatAvailable(citation_format):
+            data = clp.GetClipboardData(citation_format)
+            clp.CloseClipboard()
+            return data
 
-            rc = clp.EnumClipboardFormats(rc)
-
-        clp.CloseClipboard()
-        data = {}
-
-        data['APA'] = "no citations in clipboard"
-        data['AMA'] = "no citations in clipboard"
-        data['content'] = text
-
-        json_data = json.dumps(data)
-        return json_data
+        else:
+            clp.CloseClipboard()
+            data = {}
+            data['APA'] = "no citations in clipboard"
+            data['AMA'] = "no citations in clipboard"
+            data['content'] = text
+            json_data = json.dumps(data)
+            return json_data
     except:
         try:
             clp.CloseClipboard()
@@ -53,15 +41,11 @@ def get_citations():
             print "clipboard already closed"
 
         data = {}
-
         data['APA'] = "no citations in clipboard"
         data['AMA'] = "no citations in clipboard"
         data['content'] = "no text in clipboard"
-
         json_data = json.dumps(data)
         return json_data
-
-
 
 # Returns current clipboard source as JSON (https://localhost:5000/source.py)
 @app.route("/source.py")
@@ -74,36 +58,19 @@ def get_source():
         except:
             text = "No Text available"
 
-        formats = {}
+        source_format = clp.RegisterClipboardFormat("SOURCE")
+        if clp.IsClipboardFormatAvailable(source_format):
+            data = clp.GetClipboardData(source_format)
+            clp.CloseClipboard()
+            return data
 
-        rc = clp.EnumClipboardFormats(0)
-        while rc:
-            try:
-                format_name = clp.GetClipboardFormatName(rc)
-            except win32api.error:
-                format_name = "?"
-            # print "format", rc, format_name
-            try:
-                format = clp.GetClipboardData(rc)
-            except win32api.error:
-                format = "?"
-            if format_name == "SOURCE":
-                clp.CloseClipboard()
-                return format
-
-            formats[format_name] = format
-
-            rc = clp.EnumClipboardFormats(rc)
-
-        clp.CloseClipboard()
-
-        data = {}
-
-        data['source'] = "no source in clipboard"
-        data['content'] = text
-
-        json_data = json.dumps(data)
-        return json_data
+        else:
+            clp.CloseClipboard()
+            data = {}
+            data['source'] = "no source in clipboard"
+            data['content'] = text
+            json_data = json.dumps(data)
+            return json_data
     except:
         try:
             clp.CloseClipboard()
@@ -111,10 +78,8 @@ def get_source():
             print "clipboard already closed"
 
         data = {}
-
         data['source'] = "no source in clipboard"
         data['content'] = "no text in clipboard"
-
         json_data = json.dumps(data)
         return json_data
 
