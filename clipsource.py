@@ -18,10 +18,8 @@ from habanero import cn
 from pdfminer.pdfparser import PDFParser
 from pdfminer.pdfdocument import PDFDocument
 from PySide import QtGui, QtCore
-import pygubu
 from PyQt4 import QtGui, uic
 import win32clipboard as clp, win32api
-from flask import Flask
 import isbnlib
 import re
 import base64

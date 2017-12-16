@@ -1,17 +1,18 @@
 from flask import Flask
-
 import win32clipboard as clp
-import win32api
 import json
-from OpenSSL import SSL
 
 
-
+# Setup server
 app = Flask(__name__)
 
-# Returns current clipboard citations as JSON (https://localhost:5000/citations.py)
 @app.route("/citations.py")
 def get_citations():
+    """
+    Returns the contents of the specified CITATIONS format when opening following URL: https://localhost:5000/source.py
+
+    :return: Current clipboard citations in JSON format
+    """
     try:
         clp.OpenClipboard(None)
 
@@ -50,6 +51,11 @@ def get_citations():
 # Returns current clipboard source as JSON (https://localhost:5000/source.py)
 @app.route("/source.py")
 def get_source():
+    """
+    Returns the contents of the specified SOURCE format when opening following URL: https://localhost:5000/source.py
+
+    :return: Current clipboard source in JSON format
+    """
     try:
         clp.OpenClipboard(None)
 
@@ -84,4 +90,5 @@ def get_source():
         return json_data
 
 if __name__ == "__main__":
+    # Run flask server without certificate
     app.run(ssl_context='adhoc')
