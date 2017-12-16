@@ -544,6 +544,7 @@ def putGermanWikiCitationToClipboard(source):
 
     # Then we get the contents from this link
     wiki_citation = getGermanWikiCitation(wikipedia_base_url_german + citation_link)
+    print wiki_citation
 
     clp.OpenClipboard(None)
     citations = {}
@@ -572,6 +573,8 @@ def putWikiCitationToClipboard(source):
 
     # Gets the sources of "Cite this Page"
     wiki_citation = getWikiCitation(wikipedia_base_url + citation_link)
+
+    print wiki_citation
 
     # Testing the wikipedia python module, not used
     #id = citation_link.split("id=", 1)[1]
@@ -704,6 +707,7 @@ def getCrossRefMetaData(title, path):
 
     # Prettify APA citation
     apa_citation = prettifyUTF8Strings(apa_citation).strip('\n')
+    print apa_citation
 
     clp.OpenClipboard(None)
     citations = {}
