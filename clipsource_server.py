@@ -14,20 +14,23 @@ def get_citations():
     :return: Current clipboard citations in JSON format
     """
     try:
+        # Try to get the clipboard's text. If no text is available, set "No Text available" as text
         clp.OpenClipboard(None)
-
         try:
             text = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
         except:
             text = "No Text available"
 
+        # Register citation format, so we can check if this format is available
         citation_format = clp.RegisterClipboardFormat("CITATIONS")
+        # Checks if citations are available, then returns them as JSON
         if clp.IsClipboardFormatAvailable(citation_format):
             data = clp.GetClipboardData(citation_format)
             clp.CloseClipboard()
             return data
 
         else:
+            # If format is unavailable, set placeholders as data and return JSON object
             clp.CloseClipboard()
             data = {}
             data['APA'] = "no citations in clipboard"
@@ -36,6 +39,7 @@ def get_citations():
             json_data = json.dumps(data)
             return json_data
     except:
+        # If anything above fails, close the clipboard und return placeholders as JSON object
         try:
             clp.CloseClipboard()
         except:
@@ -57,20 +61,23 @@ def get_source():
     :return: Current clipboard source in JSON format
     """
     try:
+        # Try to get the clipboard's text. If no text is available, set "No Text available" as text
         clp.OpenClipboard(None)
-
         try:
             text = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
         except:
             text = "No Text available"
 
+        # Register source format, so we can check if this format is available
         source_format = clp.RegisterClipboardFormat("SOURCE")
         if clp.IsClipboardFormatAvailable(source_format):
+            # Checks if sources are available, then returns them as JSON
             data = clp.GetClipboardData(source_format)
             clp.CloseClipboard()
             return data
 
         else:
+            # If format is unavailable, set placeholders as data and return JSON object
             clp.CloseClipboard()
             data = {}
             data['source'] = "no source in clipboard"
@@ -78,6 +85,7 @@ def get_source():
             json_data = json.dumps(data)
             return json_data
     except:
+        # If anything above fails, close the clipboard und return placeholders as JSON object
         try:
             clp.CloseClipboard()
         except:

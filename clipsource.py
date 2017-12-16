@@ -1,5 +1,4 @@
 ## Imports
-from threading import Thread
 import datetime
 import psutil as psutil
 import win32gui
@@ -17,7 +16,6 @@ from habanero import Crossref
 from habanero import cn
 from pdfminer.pdfparser import PDFParser
 from pdfminer.pdfdocument import PDFDocument
-from PySide import QtGui, QtCore
 from PyQt4 import QtGui, uic
 import win32clipboard as clp, win32api
 import isbnlib
@@ -325,180 +323,176 @@ def clipboardChanged():
     """
     try:
         print "CLIPBOARD CHANGED"
+
+        # Gets current window
         current_window = win32gui.GetWindowText(win32gui.GetForegroundWindow())
 
+        # Gets current app name by window
         app_name = get_app_name(win32gui.GetForegroundWindow())
 
-        mimeData = clipboard.mimeData()
-
+        # We don't want to do anything when copying in Word
         if app_name == 'WINWORD.EXE':
             return
 
+        # If application is Acrobat Reader, try to extract PDF metadata
         if "AcroRd32.exe" in app_name or "AcroRd64.exe" in app_name:
             last_clipboard_content_for_pdf.append(clipboard.text())
 
+            # Save window ID (when copying in a PDF and then switching windows quickly, the window ID is false sometimes, so we save the first one)
             if (".pdf" in win32gui.GetWindowText(win32gui.GetForegroundWindow())):
                 pdf_window_id.append(win32gui.GetForegroundWindow())
 
+            # Clipboard dataChanged fires 5 times when copying in a PDF document, so we execute the function after it's fired for the fifth time
             if (len(last_clipboard_content_for_pdf) % 5 == 0):
-                print pdf_window_id[-1]
 
+                # Get process ID of PDF reader
                 process_id = win32process.GetWindowThreadProcessId(pdf_window_id[-1])
+
+                # Gets the PDF metadata, then searches Crossref API and puts the data on the clipboard
                 getPdfMetaData(current_window, process_id)
                 return
         else:
+            # If clipboard data has HTML-Format, extract the source
             if HTMLClipboard.HasHtml():
+
+                # Source URL of copied content
                 source = HTMLClipboard.GetSource()
                 print source
 
                 if (source != None):
                     if source != 'about:blank':
+                        # Gets metadata from source URL
                         getMetaDataFromUrl(source)
 
                     if wikipedia_base_url in source:
-                        print "is english wiki"
+                        # Gets the english Wiki citations and puts them on the clipboard
                         putWikiCitationToClipboard(source)
                         return
 
                     if wikipedia_base_url_german in source:
-                        print "is german wiki"
+                        # Gets the german Wiki citations and puts them on the clipboard
                         putGermanWikiCitationToClipboard(source)
                         return
 
+                # If clipboard has HTML-Fragment, but the source is 'None', it's an image
                 if (source == None):
                     try:
                         print "is image"
                         try:
                             html = ""
                             clp.OpenClipboard(None)
-                            rc = clp.EnumClipboardFormats(0)
-                            while rc:
+                            enumFormats = clp.EnumClipboardFormats(0)
+                            while enumFormats:
                                 try:
-                                    format_name = clp.GetClipboardFormatName(rc)
+                                    format_name = clp.GetClipboardFormatName(enumFormats)
                                 except win32api.error:
                                     format_name = "?"
                                 try:
-                                    format = clp.GetClipboardData(rc)
+                                    format = clp.GetClipboardData(enumFormats)
                                 except win32api.error:
                                     format = "?"
                                 if (format_name == "HTML Format"):
                                     print format
                                     html = format
                                     break
-                                rc = clp.EnumClipboardFormats(rc)
+                                enumFormats = clp.EnumClipboardFormats(enumFormats)
 
                             clp.CloseClipboard()
 
+                            # Find the image source URL with beautifulsoup
                             soup = BeautifulSoup(html, "html.parser")
-
                             link = soup.find('img')['src']
                             print link
-                            source = link
 
+                            # Image source URL
+                            source = link
 
                         except:
                             print "could not find source"
                             return
 
+                        # Checks if image was from Wikimedia
                         if "wikimedia" in current_window.lower():
-                            print "is wikimedia"
+                            # Gets Wikimedia citations
                             meta_data = getWikiMediaMetaData(source)
 
+                            # Puts the extracted citations on the clipboard
                             clp.OpenClipboard(None)
-
                             sources = {}
-
                             meta = {}
-
                             sources['content'] = "image with citation"
                             sources['source'] = source
-
                             meta['citations'] = meta_data['APA']
-
                             print meta_data
                             clp.SetClipboardData(src_format, json.dumps(sources))
                             clp.SetClipboardData(citation_format, json.dumps(meta))
-
                             clp.CloseClipboard()
-
                             return
+                        # Checks if copied image was from Getty Images
                         if "getty" in current_window.lower():
-
+                            # Gets the image's metadata
                             meta_data = getGettyImageMetadata(source)
-
+                            # Puts the extracted metadata on the clipboard
                             clp.OpenClipboard(None)
-
                             sources = {}
-
                             meta = {}
-
                             sources['content'] = "image with metadata"
                             sources['source'] = source
-
                             meta['citations'] = meta_data
-
                             print meta_data
                             clp.SetClipboardData(src_format, json.dumps(sources))
                             clp.SetClipboardData(citation_format, json.dumps(meta))
-
                             clp.CloseClipboard()
                             return
                         else:
-
+                            # If the image is not from Wikimedia or Getty Images, extract it's source URL and put it on the clipboard
                             try:
                                 clp.OpenClipboard(None)
-
                                 try:
                                     src = clp.GetClipboardData(src_format)
                                 except:
                                     src = 'none'
 
-                                print "SOURCE ", src
+                                # After putting the data on the clipboard, clipboardChanged is called again. In this case we return and do nothing
                                 if "image" in src:
                                     clp.CloseClipboard()
                                     return
                                 else:
+                                    # Put the image source on the clipboard
                                     sources = {}
-
                                     sources['content'] = "image"
                                     sources['source'] = source
-
                                     clp.OpenClipboard(None)
                                     clp.SetClipboardData(src_format, json.dumps(sources))
                                     print clp.GetClipboardData(src_format)
-
                                     clp.CloseClipboard()
                                     return
                             except:
+                                # If above code fails, try to put the source on the clipboard anyway
                                 sources = {}
-
                                 sources['content'] = "image"
                                 sources['source'] = source
-
                                 clp.OpenClipboard(None)
                                 clp.SetClipboardData(src_format, json.dumps(sources))
                                 print clp.GetClipboardData(src_format)
-
                                 clp.CloseClipboard()
-
                                 return
                     except:
                         print "image exception"
 
+                # If clipboard contains HTML data, but everything above fails, try to put the URL and the content on the clipboard
                 clp.OpenClipboard(None)
                 sources = {}
                 sources['source'] = source
                 sources['content'] = unicode(clp.GetClipboardData(clp.CF_TEXT), errors='replace')
-
                 clp.SetClipboardData(src_format, json.dumps(sources))
-
                 clp.CloseClipboard()
 
             else:
                 # If clipboard has no HTML-content, check if it's a file
                 checkForFile()
     except:
-        # Close the clipboard, if there was an exception
+        # Close the clipboard, if there was an exception when trying to extract sources
         try:
             clp.CloseClipboard()
         except:
