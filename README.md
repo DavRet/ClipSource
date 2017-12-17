@@ -1,4 +1,4 @@
-# ClipSource
+# ClipSource Python Scripts
 
 clipsource.py:
 
