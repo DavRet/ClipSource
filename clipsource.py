@@ -16,7 +16,9 @@ from habanero import Crossref
 from habanero import cn
 from pdfminer.pdfparser import PDFParser
 from pdfminer.pdfdocument import PDFDocument
-from PyQt4 import QtGui, uic
+
+from PyQt5.QtWidgets import QApplication
+
 import win32clipboard as clp, win32api
 import isbnlib
 import re
@@ -24,7 +26,7 @@ import base64
 import requests
 
 # Setup QT for listening to clipboard changes
-app = QtGui.QApplication(sys.argv)
+app = QApplication(sys.argv)
 clipboard = app.clipboard()
 
 clips = []
