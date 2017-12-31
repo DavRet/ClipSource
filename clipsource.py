@@ -19,7 +19,7 @@ from pdfminer.pdfdocument import PDFDocument
 
 from PyQt5.QtWidgets import QApplication
 
-import win32clipboard as clp, win32api
+import win32clipboard as clp
 import isbnlib
 import re
 import base64
@@ -33,7 +33,7 @@ clips = []
 currentIndex = []
 
 # Used for getting application name and path
-c = wmi.WMI()
+window_management_instrumentation = wmi.WMI()
 
 # Copying in PDFs fires multiple events, so the contents are stored here and then checked if they have changed
 last_clipboard_content_for_pdf = []
@@ -58,7 +58,7 @@ def main():
     """
 
     # Connects the clipboard changed event to clipboardChanged function
-    clipboard.dataChanged.connect(clipboardChanged)
+    clipboard.dataChanged.connect(clipboard_changed)
 
     # Fixes false decoding errors
     reload(sys)
@@ -68,7 +68,7 @@ def main():
     sys.exit(app.exec_())
 
 
-def testIsbnExtraction():
+def test_isbn_extraction():
     """
     For further usage, not used at the moment
     """
@@ -79,7 +79,7 @@ def testIsbnExtraction():
     print isbnlib.meta(isbn, service='default', cache='default')
 
 
-def printAllFormats():
+def print_all_formats():
     """
     Prints all current clipboard formats and their names, for testing purposes only
     """
@@ -87,23 +87,23 @@ def printAllFormats():
     # Opens the Clipboard
     clp.OpenClipboard()
     # Enumerates Clipboard Formats
-    clpEnum = clp.EnumClipboardFormats(0)
+    clp_enum = clp.EnumClipboardFormats(0)
     # Loops over Format Enumerations
-    while clpEnum:
+    while clp_enum:
         try:
             # Gets the Format Name
-            format_name = clp.GetClipboardFormatName(clpEnum)
-        except win32api.error:
+            format_name = clp.GetClipboardFormatName(clp_enum)
+        except clp.error:
             format_name = "not defined"
         try:
             # Gets the Format
-            format = clp.GetClipboardData(clpEnum)
-        except win32api.error:
+            format = clp.GetClipboardData(clp_enum)
+        except clp.error:
             format = "not defined"
 
         print format_name
         print format
-        clpEnum = clp.EnumClipboardFormats(clpEnum)
+        clp_enum = clp.EnumClipboardFormats(clp_enum)
 
     # Closes the Clipboard
     clp.CloseClipboard()
@@ -116,7 +116,7 @@ def get_app_path(hwnd):
     """
     try:
         _, pid = win32process.GetWindowThreadProcessId(hwnd)
-        for p in c.query('SELECT ExecutablePath FROM Win32_Process WHERE ProcessId = %s' % str(pid)):
+        for p in window_management_instrumentation.query('SELECT ExecutablePath FROM Win32_Process WHERE ProcessId = %s' % str(pid)):
             exe = p.ExecutablePath
             break
     except:
@@ -133,7 +133,7 @@ def get_app_name(hwnd):
     """
     try:
         _, pid = win32process.GetWindowThreadProcessId(hwnd)
-        for p in c.query('SELECT Name FROM Win32_Process WHERE ProcessId = %s' % str(pid)):
+        for p in window_management_instrumentation.query('SELECT Name FROM Win32_Process WHERE ProcessId = %s' % str(pid)):
             exe = p.Name
             break
     except:
@@ -144,7 +144,7 @@ def get_app_name(hwnd):
 
 
 
-def getLinkForWikiCitation(url):
+def get_link_for_wiki_citation(url):
     """
     Builds link to Wiki Citation page
     :param url: URL of Wiki article
@@ -163,7 +163,7 @@ def getLinkForWikiCitation(url):
             return "no link"
 
 
-def getWikiCitation(url):
+def get_wiki_citation(url):
     """
     Gets the contents of Wikipedia "Cite this page"
     :param url: URL of Wiki article
@@ -200,7 +200,7 @@ def getWikiCitation(url):
 
 
 
-def getGettyImageMetadata(source):
+def get_getty_image_metadata(source):
     """
     Gets metadata of images copied on "Getty Images"
     :param source: Source URL of the copied image
@@ -269,7 +269,7 @@ def getGettyImageMetadata(source):
 
 
 
-def getWikiMediaMetaData(source):
+def get_wiki_media_metadata(source):
     """
     Gets "Cite this page" metadata form Wikimedia
     :param source: Source URL of copied object
@@ -282,14 +282,14 @@ def getWikiMediaMetaData(source):
     url_to_metadata = 'https://commons.wikimedia.org/wiki/File:' + url_to_metadata
 
     # Build the URL to "Cite this page"
-    citation_url = wikimedia_base_url + getLinkForWikiCitation(url_to_metadata)
+    citation_url = wikimedia_base_url + get_link_for_wiki_citation(url_to_metadata)
 
     # Gets the contents of "Cite this page" und returns them
-    return getWikiCitation(citation_url)
+    return get_wiki_citation(citation_url)
 
 
 
-def getAsBase64(url):
+def get_as_base64(url):
     """
     Helper to convert images by their URL to Base64
     :param url: Image url
@@ -297,7 +297,7 @@ def getAsBase64(url):
     """
     return base64.b64encode(requests.get(url).content)
 
-def prettifyUTF8Strings(string):
+def prettify_UTF8_Strings(string):
     """
     Helper to prettify UTF8 strings
     :param string: "ugly" string
@@ -318,7 +318,7 @@ def find(name, path):
 
 
 
-def clipboardChanged():
+def clipboard_changed():
     """
     Gets called everytime the clioboard data is changed. Source extraction always begins here.
     :return: Returns in this method are just used to prevent code from continueing. Actually the extracted sources are then "returned" to the clipboard
@@ -351,7 +351,7 @@ def clipboardChanged():
                 process_id = win32process.GetWindowThreadProcessId(pdf_window_id[-1])
 
                 # Gets the PDF metadata, then searches Crossref API and puts the data on the clipboard
-                getPdfMetaData(current_window, process_id)
+                get_pdf_metadata(current_window, process_id)
                 return
         else:
             # If clipboard data has HTML-Format, extract the source
@@ -364,16 +364,16 @@ def clipboardChanged():
                 if (source != None):
                     if source != 'about:blank':
                         # Gets metadata from source URL
-                        getMetaDataFromUrl(source)
+                        get_metadata_from_url(source)
 
                     if wikipedia_base_url in source:
                         # Gets the english Wiki citations and puts them on the clipboard
-                        putWikiCitationToClipboard(source)
+                        put_wiki_citation_to_clipboard(source)
                         return
 
                     if wikipedia_base_url_german in source:
                         # Gets the german Wiki citations and puts them on the clipboard
-                        putGermanWikiCitationToClipboard(source)
+                        put_german_wiki_citation_to_clipboard(source)
                         return
 
                 # If clipboard has HTML-Fragment, but the source is 'None', it's an image
@@ -383,21 +383,21 @@ def clipboardChanged():
                         try:
                             html = ""
                             clp.OpenClipboard(None)
-                            enumFormats = clp.EnumClipboardFormats(0)
-                            while enumFormats:
+                            clp_enum = clp.EnumClipboardFormats(0)
+                            while clp_enum:
                                 try:
-                                    format_name = clp.GetClipboardFormatName(enumFormats)
-                                except win32api.error:
+                                    format_name = clp.GetClipboardFormatName(clp_enum)
+                                except clp.error:
                                     format_name = "?"
                                 try:
-                                    format = clp.GetClipboardData(enumFormats)
-                                except win32api.error:
+                                    format = clp.GetClipboardData(clp_enum)
+                                except clp.error:
                                     format = "?"
                                 if (format_name == "HTML Format"):
                                     print format
                                     html = format
                                     break
-                                enumFormats = clp.EnumClipboardFormats(enumFormats)
+                                clp_enum = clp.EnumClipboardFormats(clp_enum)
 
                             clp.CloseClipboard()
 
@@ -416,7 +416,7 @@ def clipboardChanged():
                         # Checks if image was from Wikimedia
                         if "wikimedia" in current_window.lower():
                             # Gets Wikimedia citations
-                            meta_data = getWikiMediaMetaData(source)
+                            meta_data = get_wiki_media_metadata(source)
 
                             # Puts the extracted citations on the clipboard
                             clp.OpenClipboard(None)
@@ -433,7 +433,7 @@ def clipboardChanged():
                         # Checks if copied image was from Getty Images
                         if "getty" in current_window.lower():
                             # Gets the image's metadata
-                            meta_data = getGettyImageMetadata(source)
+                            meta_data = get_getty_image_metadata(source)
                             # Puts the extracted metadata on the clipboard
                             clp.OpenClipboard(None)
                             sources = {}
@@ -492,7 +492,7 @@ def clipboardChanged():
 
             else:
                 # If clipboard has no HTML-content, check if it's a file
-                checkForFile()
+                check_for_file()
     except:
         # Close the clipboard, if there was an exception when trying to extract sources
         try:
@@ -502,7 +502,7 @@ def clipboardChanged():
         print "exception"
 
 
-def getMetaDataFromUrl(url):
+def get_metadata_from_url(url):
     """
     Gets of available metadata from an URL
     :param url: URL of copied object
@@ -517,7 +517,7 @@ def getMetaDataFromUrl(url):
     return metadata_items
 
 
-def getGermanWikiCitation(url):
+def get_german_wiki_citation(url):
     """
     Gets contents of german wiki "Cite this page" page
     :param url: Wiki article URL
@@ -535,17 +535,17 @@ def getGermanWikiCitation(url):
     return citation
 
 
-def putGermanWikiCitationToClipboard(source):
+def put_german_wiki_citation_to_clipboard(source):
     """
     Puts sources of a german Wiki page to the clipboard
     :param source:
     """
 
     # First we have to get the link to "Cite this Page"
-    citation_link = getLinkForWikiCitation(source)
+    citation_link = get_link_for_wiki_citation(source)
 
     # Then we get the contents from this link
-    wiki_citation = getGermanWikiCitation(wikipedia_base_url_german + citation_link)
+    wiki_citation = get_german_wiki_citation(wikipedia_base_url_german + citation_link)
     print wiki_citation
 
     clp.OpenClipboard(None)
@@ -564,17 +564,17 @@ def putGermanWikiCitationToClipboard(source):
     clp.CloseClipboard()
 
 
-def putWikiCitationToClipboard(source):
+def put_wiki_citation_to_clipboard(source):
     """
     Puts the sources of a english Wiki page on the clipboard
     :param source: Source URL of Wiki article
     """
 
     # Gets the link to "Cite this Page"
-    citation_link = getLinkForWikiCitation(source)
+    citation_link = get_link_for_wiki_citation(source)
 
     # Gets the sources of "Cite this Page"
-    wiki_citation = getWikiCitation(wikipedia_base_url + citation_link)
+    wiki_citation = get_wiki_citation(wikipedia_base_url + citation_link)
 
     print wiki_citation
 
@@ -601,7 +601,7 @@ def putWikiCitationToClipboard(source):
     clp.CloseClipboard()
 
 
-def getPdfMetaData(current_window, process_id):
+def get_pdf_metadata(current_window, process_id):
     """
     Extracts PDF metadata when copying in a PDF document
     :param current_window: Window of PDF reader
@@ -610,6 +610,7 @@ def getPdfMetaData(current_window, process_id):
 
     # Get the PDF title
     pdf_title = current_window.split(" - ", 1)[0]
+    print pdf_title
     pdf_path = ''
 
     # Gets the filename by looking up which files are openend by process ID
@@ -617,6 +618,7 @@ def getPdfMetaData(current_window, process_id):
     files = p.open_files()
 
     for file in files:
+        print str(file)
         # Checks if title is in path (we need this in case multiple documents are openend in the reader
         if pdf_title in str(file):
             pdf_path = file[0]
@@ -669,12 +671,12 @@ def getPdfMetaData(current_window, process_id):
     data_for_clipboard = {"Title": title, "Author": author, "Date": str(date), "Keywords": keywords}
 
     # Gets the Crossref metadata by the title of the document. Also contains the path as parameter, because it's later saved as "Source" of the document
-    getCrossRefMetaData(title, pdf_path)
+    get_crossref_metadata(title, pdf_path)
 
 
 
 
-def getCrossRefMetaData(title, path):
+def get_crossref_metadata(title, path):
     """
     Gets Crossref metadata, given an article's title. Then puts the metadata on the clipboard
     :param title: Title to search for
@@ -708,7 +710,7 @@ def getCrossRefMetaData(title, path):
 
 
     # Prettify APA citation
-    apa_citation = prettifyUTF8Strings(apa_citation).strip('\n')
+    apa_citation = prettify_UTF8_Strings(apa_citation).strip('\n')
     print apa_citation
 
     clp.OpenClipboard(None)
@@ -731,22 +733,22 @@ def getCrossRefMetaData(title, path):
     clp.SetClipboardData(src_format, json.dumps(sources))
     clp.CloseClipboard()
 
-def checkForFile():
+def check_for_file():
     """
     Checks if copied object was a file and then tries to get it's path
     """
     try:
         clp.OpenClipboard()
 
-        rc = clp.EnumClipboardFormats(0)
-        while rc:
+        clip_enum = clp.EnumClipboardFormats(0)
+        while clip_enum:
             try:
-                format_name = clp.GetClipboardFormatName(rc)
-            except win32api.error:
+                format_name = clp.GetClipboardFormatName(clip_enum)
+            except clp.error:
                 format_name = "?"
             try:
-                format = clp.GetClipboardData(rc)
-            except win32api.error:
+                format = clp.GetClipboardData(clip_enum)
+            except clp.error:
 
                 format = "?"
             if (format_name == '?'):
@@ -768,9 +770,9 @@ def checkForFile():
                         else:
                             title = "No Title found"
 
-                        getCrossRefMetaData(title, path)
+                        get_crossref_metadata(title, path)
 
-            rc = clp.EnumClipboardFormats(rc)
+            clip_enum = clp.EnumClipboardFormats(clip_enum)
 
         clp.CloseClipboard()
 
