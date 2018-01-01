@@ -610,7 +610,6 @@ def get_pdf_metadata(current_window, process_id):
 
     # Get the PDF title
     pdf_title = current_window.split(" - ", 1)[0]
-    print pdf_title
     pdf_path = ''
 
     # Gets the filename by looking up which files are openend by process ID
@@ -618,7 +617,6 @@ def get_pdf_metadata(current_window, process_id):
     files = p.open_files()
 
     for file in files:
-        print str(file)
         # Checks if title is in path (we need this in case multiple documents are openend in the reader
         if pdf_title in str(file):
             pdf_path = file[0]
